@@ -55,6 +55,7 @@ def arm_metrics(runs, arm):
     o = load(Path(runs) / arm / "ood.json")
     if c is None or o is None:
         return None
+    dev_f1 = c["dev_calib"]["calibrated@tuned"]["f1"]         # model selection uses this only
     if isinstance(c.get("test"), dict) and "raw@0.5" in c["test"]:   # FiNERWeb-only format
         in_f1 = c["test"]["calibrated@tuned"]["f1"]
         in_nll = c["test"]["calibrated@tuned"]["nll_decision"]
@@ -65,7 +66,7 @@ def arm_metrics(runs, arm):
     ece = [o["sets"][s][KEY]["ece_predicted"] for s in OOD]
     miss = [1 - o["sets"][s][KEY]["recall"] for s in OOD]          # entity-level false negatives
     qfnr = [o["sets"][s][KEY].get("present_query_fnr") for s in OOD]
-    return {"in_f1": in_f1, "in_nll": in_nll, "ood_cn": o[f"macro_f1_crossner[{KEY}]"],
+    return {"dev_f1": dev_f1, "in_f1": in_f1, "in_nll": in_nll, "ood_cn": o[f"macro_f1_crossner[{KEY}]"],
             "ood_all": o[f"macro_f1_all[{KEY}]"], "mit_movie": o["sets"]["mit_movie"][KEY]["f1"],
             "mit_rest": o["sets"]["mit_restaurant"][KEY]["f1"],
             "ood_fpr": sum(fpr) / len(fpr), "ood_ece_pred": sum(ece) / len(ece),
@@ -158,7 +159,7 @@ def main():
     if args.exps:
         allres = collect_all(args.root, args.exps, [42, 43, 44])
         Path(args.json_out).write_text(json.dumps(allres, indent=1))
-        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_miss", "ood_qfnr",
+        cols = ["dev_f1", "in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_miss", "ood_qfnr",
                 "ood_ece_pred", "no_desc_ood_all", "no_desc_fpr", "pii_f1", "pii_fpr", "pii_miss"]
         g = Path(args.root) / "gliner2"
         if g.exists():

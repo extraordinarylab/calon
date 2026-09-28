@@ -111,6 +111,12 @@ def collect_all(root, exps, seeds):
                     continue
                 for k, v in m.items():
                     vals[k].append(v)
+                c = load(d / a / "calibration.json")
+                if c and not ("raw@0.5" in c.get("test", {})):
+                    for src, t in c["test"].items():
+                        vals[f"test/{src}"].append(t["calibrated@tuned"]["f1"])
+                elif c:
+                    vals["test/finerweb"].append(c["test"]["calibrated@tuned"]["f1"])
                 for s in OOD:
                     vals[f"f1/{s}"].append(o["sets"][s][KEY]["f1"])
                     vals[f"fpr/{s}"].append(o["sets"][s][KEY]["absent_query_fpr"])
@@ -142,6 +148,20 @@ def main():
                 print(f"{exp + '/' + a:28s}" + "".join(
                     f"{m[c]['mean']:.4f}±{m[c]['std']:.4f}".rjust(16) if c in m else " " * 16
                     for c in cols))
+        for arm in ("warmup", "bce-s0.2"):
+            print(f"== per OOD set F1, arm {arm} (mean over seeds)")
+            print("exp".ljust(14) + "".join(s.replace("crossner_", "cn_")[:10].rjust(11) for s in OOD))
+            for exp, arms in allres.items():
+                if arm in arms:
+                    print(exp.ljust(14) + "".join(f"{arms[arm]['f1/' + s]['mean']:11.4f}" for s in OOD))
+            print(f"== in-domain test F1 per source, arm {arm}")
+            srcs = ["finerweb", "fewnerd", "pile", "massive", "synth_a", "synth_c"]
+            print("exp".ljust(14) + "".join(s.rjust(11) for s in srcs))
+            for exp, arms in allres.items():
+                if arm in arms:
+                    print(exp.ljust(14) + "".join(
+                        f"{arms[arm]['test/' + s]['mean']:11.4f}" if f"test/{s}" in arms[arm] else " " * 11
+                        for s in srcs))
         return
     if args.seeds:
         seeds_table(args.seeds, args.baseline)

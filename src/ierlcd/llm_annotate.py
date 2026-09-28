@@ -215,6 +215,7 @@ def run(args):
         return
     llm = LLM(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
               gpu_memory_utilization=0.9, enforce_eager=args.eager,
+              max_num_seqs=args.max_num_seqs,     # hybrid model: 620 Mamba cache blocks here
               limit_mm_per_prompt={"image": 0, "video": 0}, seed=0)
     import time
     for c in range(0, len(todo), args.chunk):
@@ -476,6 +477,7 @@ def main():
     p.add_argument("--max-tokens", type=int, default=1536)
     p.add_argument("--max-model-len", type=int, default=6144)
     p.add_argument("--eager", action="store_true")
+    p.add_argument("--max-num-seqs", type=int, default=256)
     args = ap.parse_args()
     {"prepare-a": prepare_a, "prepare-c": prepare_c, "prepare-a2": prepare_a2,
      "assemble": assemble, "run": run}[args.cmd.replace("_", "-")](args)

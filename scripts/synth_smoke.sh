@@ -19,8 +19,8 @@ S=/scratch/u6sn/yangw.u6sn/ie-rlcd/synth
 step() { echo "== $1 $(date +%T)"; }
 
 conda activate ie-rlcd
-step prepare_a;  python -m ierlcd.llm_annotate prepare-a --n 100000 2>&1 | tail -2 | cut -c1-600
-step prepare_c;  python -m ierlcd.llm_annotate prepare-c --per-domain 1000 2>&1 | tail -2
+[ -s $S/a1_requests.jsonl ] || { step prepare_a; python -m ierlcd.llm_annotate prepare-a --n 100000 2>&1 | tail -2 | cut -c1-600; }
+[ -s $S/c_requests.jsonl ] || { step prepare_c; python -m ierlcd.llm_annotate prepare-c --per-domain 1000 2>&1 | tail -2; }
 conda activate ie-rlcd-vllm
 export HF_HUB_OFFLINE=1
 step run_a1; python -m ierlcd.llm_annotate run --task a1 --limit 300 --chunk 300 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200

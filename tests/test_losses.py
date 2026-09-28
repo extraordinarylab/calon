@@ -118,6 +118,43 @@ def test_pg_and_direct_match_finite_difference(z0, y):
     assert grads["pg"][1] > grads["direct"][1]
 
 
+@pytest.mark.parametrize("z0,y", [(-1.0, 1.0), (0.7, 0.0)])
+def test_spherical_pg_and_direct_match_finite_difference(z0, y):
+    from ierlcd.losses import spherical_term
+    sigma, K, n, alpha = 0.5, 8, 20000, 0.1
+    eps = torch.randn(200001, generator=torch.Generator().manual_seed(11), dtype=torch.float64)
+    def J(zz):
+        u = zz + sigma * eps
+        yy = torch.full_like(u, y)
+        r = -F.binary_cross_entropy_with_logits(u, yy, reduction="none") + alpha * spherical_term(u, yy)
+        return r.mean().item()
+    fd = (J(z0 + 1e-4) - J(z0 - 1e-4)) / 2e-4
+    for mode in ("direct", "pg"):
+        z = torch.full((n, 1, 1), z0, dtype=torch.float64, requires_grad=True)
+        yt = torch.full_like(z, y)
+        valid = torch.ones_like(z, dtype=torch.bool)
+        loss = loss_fn(z, yt, valid, mode, K=K, sigma=sigma, lam=1.0, alpha=alpha,
+                       generator=torch.Generator().manual_seed(5))
+        clean = F.binary_cross_entropy_with_logits(z, yt, reduction="none").mean()
+        g, = torch.autograd.grad(loss - clean, z)
+        per = -g.flatten() * n
+        m, se = per.mean().item(), per.std().item() / math.sqrt(n)
+        assert abs(m - fd) < 5 * se + 1e-3, (mode, m, fd, se)
+
+
+def test_spherical_term_is_zero_at_certainty_and_proper():
+    from ierlcd.losses import spherical_term
+    big = torch.tensor([30.0, -30.0], dtype=torch.float64)
+    assert torch.allclose(spherical_term(big, torch.tensor([1.0, 0.0], dtype=torch.float64)),
+                          torch.zeros(2, dtype=torch.float64), atol=1e-9)
+    # proper: for true probability q, expected score is maximized at p = q
+    q = 0.3
+    zs = torch.linspace(-4, 4, 801, dtype=torch.float64)
+    exp = q * spherical_term(zs, torch.ones_like(zs)) + (1 - q) * spherical_term(zs, torch.zeros_like(zs))
+    p_best = torch.sigmoid(zs[exp.argmax()]).item()
+    assert abs(p_best - q) < 0.01
+
+
 def test_bernoulli_surrogate_has_zero_expected_gradient():
     """Negative control: reward independent of a ~ Bernoulli(p), times log P(a)."""
     n = 400000

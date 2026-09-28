@@ -16,7 +16,14 @@ import torch
 import torch.nn.functional as F
 
 
-def loss_fn(z, y, valid, mode="pg", K=8, sigma=0.2, lam=0.1, generator=None, stats=None):
+def spherical_term(u, y):
+    """SPEC appendix A: (y p + (1-y)(1-p)) / sqrt(p^2 + (1-p)^2) - 1, p = sigmoid(u)."""
+    p = torch.sigmoid(u)
+    return (y * p + (1 - y) * (1 - p)) / torch.sqrt(p.square() + (1 - p).square()) - 1
+
+
+def loss_fn(z, y, valid, mode="pg", K=8, sigma=0.2, lam=0.1, generator=None, stats=None,
+            alpha=0.0):
     z, y = z.float(), y.detach().float()
     mask = valid.float()
     counts = mask.sum((-2, -1))                 # [B]
@@ -50,6 +57,8 @@ def loss_fn(z, y, valid, mode="pg", K=8, sigma=0.2, lam=0.1, generator=None, sta
     # log score, computed stably; expand y to the K-rollout shape
     reward = -F.binary_cross_entropy_with_logits(
         u, y[None].expand_as(u), reduction="none")
+    if alpha:                                  # spherical-score ablation, same for pg/direct
+        reward = reward + alpha * spherical_term(u, y[None].expand_as(u))
     if stats is not None:
         stats["mean_reward"] = mean_valid(reward.detach()).item()
 

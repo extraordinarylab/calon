@@ -46,8 +46,10 @@ def main():
         prompts.append([{"role": "system", "content": SYSTEM},
                         {"role": "user", "content": TEMPLATE.format(
                             context=SOURCE_CONTEXT[src], name=lab["name"], parent=parent)}])
+    # enforce_eager: CUDA-graph capture fails on this node's driver ("driver version is
+    # insufficient"), while eager forward passes run; ~130 prompts do not need graphs.
     kw = dict(model=args.model, tensor_parallel_size=1, max_model_len=4096,
-              gpu_memory_utilization=0.85)
+              gpu_memory_utilization=0.85, enforce_eager=True)
     try:                                   # Qwen3.5-family checkpoints carry a vision tower
         llm = LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0})
     except Exception as exc:

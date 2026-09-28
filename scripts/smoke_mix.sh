@@ -29,23 +29,11 @@ if [ ! -s $BANK ]; then
   # Existing vLLM envs do not work here: lco-embed/world carry a flash_attn built for
   # torch 2.9 under torch 2.11; drivelology-judge's vllm wheel targets CUDA 13, newer
   # than the node driver. Build a clean one with the cu129 aarch64 wheel.
-  if [ ! -x $CONDA/envs/ie-rlcd-vllm/bin/python ]; then
-    step build_vllm_env
-    conda create -y -q -n ie-rlcd-vllm python=3.12 > /dev/null
-    conda activate ie-rlcd-vllm
-    pip install -q --no-cache-dir torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
-      --index-url https://download.pytorch.org/whl/cu129
-    pip install -q --no-cache-dir \
-      "https://github.com/vllm-project/vllm/releases/download/v0.26.0/vllm-0.26.0%2Bcu129-cp38-abi3-manylinux_2_28_aarch64.whl"
+  if [ ! -f logs/env-vllm-uv.ok ]; then
+    step build_vllm_env_uv
+    bash scripts/build_vllm_env.sh && touch logs/env-vllm-uv.ok
   fi
   conda activate ie-rlcd-vllm
-  # PyPI torchvision/torchaudio (pulled in by vllm) do not match torch cu129
-  if ! ls -d $CONDA/envs/ie-rlcd-vllm/lib/python3.12/site-packages/torchvision-*+cu129.dist-info >/dev/null 2>&1; then
-    step fix_torchvision
-    pip install -q --no-cache-dir --no-deps --force-reinstall torchvision==0.26.0 torchaudio==2.11.0 \
-      --index-url https://download.pytorch.org/whl/cu129
-  fi
-  pip freeze > logs/env-vllm-freeze.txt
   step label_bank
   python -m ierlcd.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $ROOT/label_bank.log 2>&1 || { tail -20 $ROOT/label_bank.log; exit 1; }

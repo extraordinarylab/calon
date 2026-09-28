@@ -8,6 +8,8 @@
 # BCE warm-up for one seed with DDP over the node's 4 GPUs (global batch 32),
 # then calibration and OOD eval of its best checkpoint. SEED from the environment.
 set -euo pipefail
+# the submitting shell's TMPDIR (/local/user/...) does not exist on compute nodes
+export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p $TMPDIR
 source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd

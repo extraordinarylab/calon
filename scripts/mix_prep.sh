@@ -7,6 +7,7 @@
 #SBATCH --cpus-per-task=16
 # Label bank v2 (Qwen3.8-27B) and mixture build, shared by every seed.
 set -euo pipefail
+export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p $TMPDIR
 CONDA=/lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3
 source $CONDA/etc/profile.d/conda.sh
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd

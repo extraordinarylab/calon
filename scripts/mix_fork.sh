@@ -8,6 +8,8 @@
 # One fork arm (SEED, MODE, SIGMA from the environment) from that seed's warm-up
 # best checkpoint, then its calibration and OOD eval.
 set -euo pipefail
+# the submitting shell's TMPDIR (/local/user/...) does not exist on compute nodes
+export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p $TMPDIR
 source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd

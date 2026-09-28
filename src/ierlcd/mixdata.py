@@ -50,10 +50,11 @@ def step_schedule(sizes, mix, updates, batch, seed):
 class StepDataset(torch.utils.data.Dataset):
     """Step k yields this rank's contiguous slice of the global batch."""
 
-    def __init__(self, rows, steps, tokenizer, collate, W, micro, rank=0, world=1):
+    def __init__(self, rows, steps, tokenizer, collate, W, micro, rank=0, world=1, desc_dropout=0.0):
         self.rows, self.steps, self.tok = rows, steps, tokenizer
         self.collate, self.W, self.micro = collate, W, micro
         self.rank, self.world = rank, world
+        self.desc_dropout = desc_dropout
 
     def __len__(self):
         return len(self.steps)
@@ -63,7 +64,13 @@ class StepDataset(torch.utils.data.Dataset):
         per = len(self.steps[k]) // self.world
         for src, idx, qseed in self.steps[k][self.rank * per:(self.rank + 1) * per]:
             row = dict(self.rows[src][idx])
-            row["queries"] = sample_queries(row["queries"], random.Random(qseed))
+            rng = random.Random(qseed)
+            row["queries"] = sample_queries(row["queries"], rng)
+            if self.desc_dropout:
+                # regularizer: each described label is sometimes shown by name only
+                # (copies: query dicts are shared between rows)
+                row["queries"] = [dict(q, description="") if q["description"] and
+                                  rng.random() < self.desc_dropout else q for q in row["queries"]]
             for q in row["queries"]:
                 stats[f"{src}/{q['status']}"] += 1
                 stats[f"desc/{'with' if q['description'] else 'name_only'}"] += 1

@@ -6,7 +6,7 @@ import torch
 from .alignment import MAX_TEXT_TOKENS, build_candidates_np, tokenize_text
 
 LABEL_TOKEN, TEXT_TOKEN = "<LABEL>", "<TEXT>"
-SCHEMA_BUDGET, TOTAL_BUDGET = 1500, 2048
+SCHEMA_BUDGET, TOTAL_BUDGET = 1500, 3072   # 1024 text tokens + schema + specials
 STATUS_SUPERVISED = {"positive", "explicit_absent", "scope_assumed_absent"}
 
 

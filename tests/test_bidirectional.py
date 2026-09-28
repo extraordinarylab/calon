@@ -1,11 +1,13 @@
 """SPEC 6 test 6: the Qwen encoder is really bidirectional, padding-isolated, and
 SDPA / eager agree. Skipped when the weights are not on disk."""
+import os
 from pathlib import Path
 
 import pytest
 import torch
 
-QWEN = Path("/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen2.5-0.5B")
+QWEN = Path(os.environ.get("QWEN_TEST_PATH",
+                           "/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen2.5-0.5B"))
 pytestmark = pytest.mark.skipif(not (QWEN / "config.json").exists(), reason="Qwen2.5-0.5B not on disk")
 
 

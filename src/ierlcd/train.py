@@ -76,6 +76,8 @@ def main():
                     help="rlcd: per-span choice over [none, labels], Plackett-Luce + Brier")
     ap.add_argument("--brier_weight", type=float, default=1.0)
     ap.add_argument("--fewnerd_fine_only", action="store_true")
+    ap.add_argument("--desc_dropout", type=float, default=0.0,
+                    help="probability of showing a described label by name only (training)")
     ap.add_argument("--enc_lr", type=float, default=2e-5)
     ap.add_argument("--head_lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.01)
@@ -120,7 +122,8 @@ def main():
     steps = step_schedule({s: len(r) for s, r in rows.items()}, mix, args.updates, args.batch,
                           args.seed)
     loader = torch.utils.data.DataLoader(
-        StepDataset(rows, steps, tok, collate, args.W, args.micro, rank, world), batch_size=None,
+        StepDataset(rows, steps, tok, collate, args.W, args.micro, rank, world, args.desc_dropout),
+        batch_size=None,
         shuffle=False, num_workers=args.workers, prefetch_factor=4, persistent_workers=False)
 
     base = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).to(device)

@@ -1,7 +1,7 @@
 """Token-span candidates mapped back to character offsets (SPEC 3)."""
 import numpy as np
 
-MAX_TEXT_TOKENS = 512
+MAX_TEXT_TOKENS = 1024        # one window; texts are pre-filtered to fit (was 512 in round 1)
 
 
 def build_candidates_np(text, offsets, W):

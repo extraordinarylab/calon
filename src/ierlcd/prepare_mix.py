@@ -326,6 +326,7 @@ def main():
     ap.add_argument("--ood", default=str(ROOT / "data/ood"))
     ap.add_argument("--encoder", default="answerdotai/ModernBERT-base")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--max_tokens", type=int, default=512, help="text window (tokens)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -352,8 +353,8 @@ def main():
 
     pile = adapt_pile(PILE_TYPE, "type", stats) + adapt_pile(PILE_DEF, "definition", stats)
     lengths = tok([r["text"] for r in pile], add_special_tokens=False)["input_ids"]
-    pile = [r for r, ids in zip(pile, lengths) if len(ids) <= 512]
-    stats["pile_drop_over_512_tokens"] = len(lengths) - len(pile)
+    pile = [r for r, ids in zip(pile, lengths) if len(ids) <= args.max_tokens]
+    stats[f"pile_drop_over_{args.max_tokens}_tokens"] = len(lengths) - len(pile)
     by_hash = collections.defaultdict(list)
     for i, r in enumerate(pile):
         by_hash[sha(norm_text(r["text"]))].append(i)

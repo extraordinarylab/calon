@@ -27,7 +27,8 @@ step inventory;  python -m ierlcd.prepare_mix --stage inventory --out $MIX
 
 if [ ! -s $BANK ]; then
   step label_bank
-  conda activate lco-embed
+  # lco-embed/world carry a flash_attn built for another torch ABI; this env has none
+  conda activate drivelology-judge
   python -m ierlcd.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $ROOT/label_bank.log 2>&1 || { tail -20 $ROOT/label_bank.log; exit 1; }
   tail -8 $ROOT/label_bank.log

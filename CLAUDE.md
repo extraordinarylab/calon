@@ -17,6 +17,29 @@ sbatch --partition=workq --time=23:59:00 --gres=gpu:4 --cpus-per-task=64 <script
 Environment builds (`conda create`, `pip install`, compiling CUDA extensions)
 count as compute: submit them, do not run them on the login node.
 
+### The login node runs nothing — not even "small" things
+
+Commands on the login node have repeatedly got the Claude session killed and
+crashed VS Code. The login node is only for:
+
+- editing files (Read / Edit / Write), `git`
+- `sbatch`, `squeue`, `sacct`, `scancel`
+- `tail` / `cat` / `ls` of logs and small result files
+
+Everything else goes into an sbatch script on the **interactive** partition,
+however quick it looks. That includes:
+
+- any `python` — data inspection, JSON summaries of results, `pytest`,
+  one-line `python -c`
+- importing libraries to check versions (`import vllm`, `import torch`):
+  read `site-packages/*.dist-info` names with `ls` instead
+- scanning datasets, `du` / `find` over large trees (weights, HF caches)
+- `curl` / `hf` downloads — agents doing web research use WebSearch /
+  WebFetch, not shell commands
+
+For result tables, have the job itself write a small summary file (text or
+JSON) and `cat` it.
+
 ## Partition limits
 
 | | interactive | workq |

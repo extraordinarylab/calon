@@ -55,4 +55,10 @@ def test_sdpa_matches_eager(sdpa):
     a = tok("Taylor Swift released Midnights in 2022", add_special_tokens=False)["input_ids"]
     ids, mask = [a + [0, 0]], [[1] * len(a) + [0, 0]]
     hs, he = hidden(m, ids, mask), hidden(me, ids, mask)
-    assert torch.allclose(hs[0, :len(a)], he[0, :len(a)], atol=1e-3)
+    diff = (hs[0, :len(a)] - he[0, :len(a)]).abs().max().item()
+    scale = hs[0, :len(a)].abs().max().item()
+    assert diff <= 1e-4 * scale + 1e-4, (diff, scale)
+    # eager must be bidirectional too, not silently causal
+    b = tok("Paris is lovely", add_special_tokens=False)["input_ids"]
+    c = tok("Paris is awful", add_special_tokens=False)["input_ids"]
+    assert (hidden(me, [b], [[1] * len(b)])[0, 0] - hidden(me, [c], [[1] * len(c)])[0, 0]).abs().max() > 1e-3

@@ -57,15 +57,16 @@ def load_rows(path):
 
 class Collator:
     def __init__(self, tokenizer, label_token_id, text_token_id):
-        self.cls, self.sep, self.pad = (tokenizer.cls_token_id, tokenizer.sep_token_id,
-                                        tokenizer.pad_token_id)
+        # decoder tokenizers (Qwen) have no CLS/SEP: the sequence then starts at <LABEL>
+        self.cls, self.sep = tokenizer.cls_token_id, tokenizer.sep_token_id
+        self.pad = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
         self.lab, self.txt = label_token_id, text_token_id
 
     def __call__(self, encs):
         B = len(encs)
         seqs, label_spans, text_start = [], [], []
         for e in encs:
-            ids, spans = [self.cls], []
+            ids, spans = ([self.cls] if self.cls is not None else []), []
             for lid in e["label_ids"]:
                 ids.append(self.lab)
                 spans.append((len(ids), len(ids) + len(lid)))
@@ -73,7 +74,8 @@ class Collator:
             ids.append(self.txt)
             text_start.append(len(ids))
             ids.extend(e["text_ids"])
-            ids.append(self.sep)
+            if self.sep is not None:
+                ids.append(self.sep)
             seqs.append(ids)
             label_spans.append(spans)
         T = max(map(len, seqs))

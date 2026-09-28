@@ -307,13 +307,17 @@ def prepare_a2(args):
 
 # ---------------------------------------------------------------- assemble
 def align(text, spans, find_all):
-    out = []
+    """All occurrences of every span string; None if any string is not in the text.
+    Occurrences nested inside a longer occurrence of the same type are dropped
+    ("Still Modernism" inside "Still Modernism: Photography, Literature, Film")."""
+    out = set()
     for s in spans:
         occ = find_all(text, s)
         if not occ:
             return None
-        out += occ
-    return out
+        out.update(occ)
+    return sorted(o for o in out
+                  if not any(p != o and p[0] <= o[0] and o[1] <= p[1] for p in out))
 
 
 def assemble(args):
@@ -438,6 +442,11 @@ def assemble(args):
     from .prepare_mix import fixed_eval_queries
     summary = {}
     for src, rows in rows_by_src.items():
+        # keep every row's full schema well under the 1,500-token schema budget
+        before = len(rows)
+        rows = [r for r in rows if sum(len(q["label"]) + len(q["description"]) + 3
+                                       for q in r["queries"]) <= 4000]
+        stats[f"{src}_drop_long_schema"] = before - len(rows)
         rows = contamination_filter(rows, ood_test, stats, src)
         by_hash = collections.defaultdict(list)
         for i, r in enumerate(rows):

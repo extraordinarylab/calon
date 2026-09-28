@@ -14,9 +14,12 @@ ARMSET=${ARMSET:-full}
 INIT_EXP=${INIT_EXP:-$EXP}
 SEEDS=${SEEDS:-"42 43 44"}
 DEP=${AFTER:+--dependency=afterok:$AFTER}
+# MIXSPEC contains commas, which --export=... would split: pass it through the
+# environment (--export=ALL) and list only comma-free variables explicitly.
+export EXP MIXSPEC ENCODER INIT_EXP
 ALL=()
 for S in $SEEDS; do
-  COMMON="ALL,SEED=$S,EXP=$EXP,MIXSPEC=$MIXSPEC,ENCODER=$ENCODER,INIT_EXP=$INIT_EXP"
+  COMMON="ALL,SEED=$S"
   if [ "$ARMSET" = full ]; then
     W=$(sbatch --parsable $DEP --export=$COMMON --job-name=wu-$EXP-s$S scripts/mix_warmup_ddp.sh)
     ALL+=($W)

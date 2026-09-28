@@ -5,8 +5,8 @@
 <style>
 :root {
   --bg: #f5f6f8; --surface: #ffffff; --ink: #1b2230; --muted: #5a6475; --line: #dde1e8;
-  --accent: #2c55c7; --accent-soft: #e3e9f8; --amber: #a86a12; --amber-soft: #f6ead6;
-  --good: #1f7a4d; --grid: #e6e9ef;
+  --accent: #2c55c7; --accent-soft: #e3e9f8; --rlcd: #1f7a4d; --rlcd-soft: #dcefe4;
+  --amber: #a86a12; --amber-soft: #f6ead6; --grid: #e6e9ef;
   --serif: "Noto Serif TC", "Songti TC", serif;
   --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -15,30 +15,31 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441;
-    --accent: #7fa0ff; --accent-soft: #1f2a44; --amber: #e2a54c; --amber-soft: #3a2c16;
-    --good: #5fcf95; --grid: #252d39;
+    --accent: #7fa0ff; --accent-soft: #1f2a44; --rlcd: #5fcf95; --rlcd-soft: #17352a;
+    --amber: #e2a54c; --amber-soft: #3a2c16; --grid: #252d39;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441;
-  --accent: #7fa0ff; --accent-soft: #1f2a44; --amber: #e2a54c; --amber-soft: #3a2c16;
-  --good: #5fcf95; --grid: #252d39;
+  --accent: #7fa0ff; --accent-soft: #1f2a44; --rlcd: #5fcf95; --rlcd-soft: #17352a;
+  --amber: #e2a54c; --amber-soft: #3a2c16; --grid: #252d39;
 }
-body { background: var(--bg); color: var(--ink); font: 16px/1.75 var(--sans); padding: 40px 18px 64px; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.75 var(--sans); padding-block: 40px 64px; padding-inline: 18px; }
 .wrap { max-width: 880px; margin: 0 auto; display: grid; gap: 40px; }
 header { display: grid; gap: 10px; }
 .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 h1 { font: 700 34px/1.25 var(--serif); margin: 0; text-wrap: balance; }
 h2 { font: 700 23px/1.35 var(--serif); margin: 0 0 6px; text-wrap: balance; }
+h3 { font: 700 17px/1.4 var(--sans); margin: 8px 0 0; }
 p { margin: 0; max-width: 66ch; }
-.lede { font-size: 18px; color: var(--ink); }
+.lede { font-size: 18px; }
 .muted { color: var(--muted); }
 section { display: grid; gap: 14px; }
 .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .finding { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
 .finding b { font: 500 26px/1.1 var(--mono); color: var(--accent); }
-.finding.no b { color: var(--muted); }
+.finding.r b { color: var(--rlcd); }
 .finding span { font-size: 15px; }
 .chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px 8px; overflow-x: auto; }
 .chart svg { display: block; width: 100%; min-width: 560px; height: auto; }
@@ -56,120 +57,142 @@ td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td:first-child { font-family: var(--sans); }
 tbody tr:last-child td { border-bottom: 0; }
 tr.seeded td { color: var(--amber); }
-tr.seeded td:first-child::after { content: "非 zero-shot"; font-size: 11px; margin-left: 8px; padding: 1px 6px; border-radius: 99px; background: var(--amber-soft); }
-.best { font-weight: 500; color: var(--good); }
+.win { font-weight: 500; color: var(--rlcd); }
+.terms { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; font-size: 15px; max-width: 72ch; }
+.terms dt { font-weight: 700; }
+.terms dd { margin: 0; color: var(--ink); }
+.box { background: var(--amber-soft); border-radius: 10px; padding: 14px 18px; display: grid; gap: 8px; }
 ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 70ch; }
 .note { font-size: 14px; color: var(--muted); }
 footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
-@media (max-width: 520px) { h1 { font-size: 27px; } body { padding-inline: 16px; } }
+@media (max-width: 520px) { h1 { font-size: 27px; } .terms { grid-template-columns: 1fr; } }
 </style>
 
 <div class="wrap">
 <header>
-  <div class="eyebrow">Schema-conditioned NER · 2026-09-28 · 189 個訓練 run × 3 seeds</div>
-  <h1>加資料翻倍，RL 沒有幫助</h1>
-  <p class="lede">在訓練時沒看過的七個領域上，加入更多訓練資料讓模型分數從 0.19 升到 0.43，換成雙向 Qwen2.5 再升到 0.47。SPEC 想驗證的 RL 做法（policy gradient）在所有設定下都沒有比一般訓練更好。</p>
+  <div class="eyebrow">英文命名實體抽取 · 2026-09-28 · 第二版</div>
+  <h1>加資料翻倍，RLCD 大幅減少亂抓</h1>
+  <p class="lede">在訓練時沒看過的七個領域上，加入更多訓練資料讓分數從 0.19 升到 0.45；照參考文章實作的 RLCD 讓「句子裡沒有的類別也硬抓一個」的情況從 18% 降到 5–7%。雙向 Qwen2.5 比 ModernBERT 好。</p>
 </header>
 
 <section class="findings" aria-label="三個結論">
-  <div class="finding"><b>0.19 → 0.43</b><span>加入 Few-NERD、Pile-NER、MASSIVE 三份公開資料後，其他領域的平均 F1。模型的機率也變得可信，不再需要大幅縮放。</span></div>
-  <div class="finding"><b>0.46 → 0.52</b><span>同樣的資料，把 ModernBERT 換成改成雙向的 Qwen2.5-0.5B，CrossNER 平均 F1 明顯提升。</span></div>
-  <div class="finding no"><b>±0.005</b><span>BCE、direct、PG 八種訓練方式之間的差距，和換一個隨機種子的起伏一樣小。spherical score 也沒有影響。</span></div>
+  <div class="finding"><b>0.19 → 0.45</b><span>加入 Few-NERD、Pile-NER、MASSIVE 等訓練資料後，沒看過的領域的平均 F1。</span></div>
+  <div class="finding r"><b>18% → 5%</b><span>RLCD 讓亂抓率大幅下降，MIT 兩個測試集和訓練來源自己的分數也都提高。CrossNER 則有好有壞。</span></div>
+  <div class="finding"><b>0.47 → 0.54</b><span>同樣用 BCE，把 ModernBERT 換成雙向 Qwen2.5 後的 CrossNER 平均 F1。</span></div>
 </section>
 
 <section>
-  <h2>各實驗在沒看過的領域上的表現</h2>
-  <p class="muted">7 個測試集（CrossNER 五個領域、MIT 電影、MIT 餐廳）的平均 F1，BCE 組，3 個 seed 的平均與標準差。琥珀色的實驗用了目標領域訓練集當種子，不是 zero-shot。</p>
-  <div class="chart"><svg id="bars" viewBox="0 0 760 330" role="img" aria-label="各實驗其他領域平均 F1 長條圖"></svg>
-    <div class="legend"><span><i style="background:var(--accent)"></i>zero-shot</span><span><i style="background:var(--amber)"></i>用了目標領域種子（非 zero-shot）</span><span>細線＝±1 標準差</span></div>
+  <h2>名詞說明</h2>
+  <dl class="terms">
+    <dt>F1</dt><dd>抽取準確度，0 到 1，越高越好。</dd>
+    <dt>seed（隨機種子）</dt><dd>每個實驗用 3 個種子各跑一次，表中是平均與標準差，用來判斷差距是不是運氣。</dd>
+    <dt>沒看過的領域</dt><dd>CrossNER 五個領域（AI、文學、音樂、政治、科學）與 MIT 電影、MIT 餐廳。訓練時完全不用；門檻只用訓練來源自己的驗證資料決定（zero-shot）。</dd>
+    <dt>亂抓率</dt><dd>句子裡沒有某個類別時，模型仍然對它輸出片段的比例。越低越好。</dd>
+    <dt>信心誤差</dt><dd>模型說「80% 把握」時，實際對的比例和 80% 差多少。越低越好。</dd>
+    <dt>BCE</dt><dd>一般訓練：每個「片段 × 類別」各自判斷是或不是。</dd>
+    <dt>RLCD</dt><dd>照參考文章：每個片段在「要問的所有類別＋『不是實體』」之間選一個，機率加起來等於 1；損失是選對答案的 log 機率加上 Brier score。沒有強化學習，也沒有抽樣。</dd>
+  </dl>
+</section>
+
+<section>
+  <h2>實驗一：訓練資料的影響</h2>
+  <p class="muted">全部用 BCE 訓練 12,000 步。長條是沒看過的七個領域的平均 F1，細線是 ±1 標準差（3 個種子）。</p>
+  <div class="chart"><svg id="bars" viewBox="0 0 760 250" role="img" aria-label="各訓練資料組合的沒看過領域平均 F1"></svg></div>
+  <div class="tbl"><table>
+    <thead><tr><th>訓練資料（BCE）</th><th>平均</th><th>CrossNER</th><th>MIT 電影</th><th>MIT 餐廳</th><th>亂抓率</th><th>信心誤差</th></tr></thead>
+    <tbody>
+      <tr><td>0 只有 FiNERWeb（1 個種子）</td><td>0.195</td><td>0.221</td><td>0.158</td><td>0.098</td><td>25%</td><td>0.44</td></tr>
+      <tr><td>1 ＋Few-NERD、Pile-NER、MASSIVE</td><td>0.427 ± 0.005</td><td>0.451</td><td>0.374</td><td>0.357</td><td>19%</td><td>0.14</td></tr>
+      <tr><td>2a ＋Qwen3.8 標註的網頁文字 25%</td><td>0.430 ± 0.014</td><td>0.460</td><td>0.384</td><td>0.328</td><td>22%</td><td>0.18</td></tr>
+      <tr><td>2b ＋Qwen3.8 標註的網頁文字 50%</td><td>0.424 ± 0.011</td><td>0.452</td><td>0.361</td><td>0.350</td><td>21%</td><td>0.18</td></tr>
+      <tr><td>4 資料同 2a，換成雙向 Qwen2.5</td><td>0.471 ± 0.016</td><td>0.516</td><td>0.424</td><td>0.298</td><td>19%</td><td>0.18</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="note">
+    <li>加三份公開資料讓分數翻倍，模型給的機率也變可信（之前要把分數縮小約 1.8 倍才準，現在幾乎不用調）。</li>
+    <li>網頁文字只小幅幫助；Qwen3.8 找出的 70 萬個「這個類別不存在」例子沒有降低亂抓率。</li>
+  </ul>
+
+  <div class="box">
+    <h3>另一組：用目標領域的例句生成資料（不算 zero-shot）</h3>
+    <p>從 CrossNER 和 MIT 的<b>訓練集</b>每次拿 5 句標好的例句，連同它們的類別名稱和說明交給 Qwen3.8，請它寫 5 句風格相同、內容不同的新句子並標註，一共約 2.8 萬句，加進訓練資料。測試時模型沒有拿到任何例句，所以不是 few-shot 提示；但訓練時已經看過仿照目標領域寫的句子，所以不算 zero-shot。</p>
+    <div class="tbl"><table>
+      <thead><tr><th>實驗</th><th>平均</th><th>CrossNER</th><th>MIT 電影</th><th>MIT 餐廳</th><th>亂抓率</th></tr></thead>
+      <tbody>
+        <tr class="seeded"><td>3a（2a ＋生成資料 15%）</td><td>0.590 ± 0.009</td><td>0.595</td><td>0.570</td><td>0.585</td><td>9%</td></tr>
+        <tr class="seeded"><td>3b（2b ＋生成資料 15%）</td><td>0.586 ± 0.013</td><td>0.585</td><td>0.574</td><td>0.600</td><td>10%</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">分數大幅提高，說明主要瓶頸是目標領域怎麼定義和標註類別。這組數字不能當成 zero-shot 結果引用。</p>
   </div>
 </section>
 
 <section>
-  <h2>八種訓練方式看不出差別</h2>
-  <p class="muted">每一列是一個實驗，每個點是一種訓練方式（warm-up 加 8 個分叉）的其他領域平均 F1。同一列的點幾乎疊在一起；列與列之間的差距來自資料和模型，不是訓練方式。淡色區間是 BCE 組 ±1 標準差。</p>
-  <div class="chart"><svg id="dots" viewBox="0 0 760 330" role="img" aria-label="各實驗八種訓練方式的點圖"></svg>
-    <div class="legend"><span><i style="background:var(--muted)"></i>warm-up／BCE／BCE×1.1</span><span><i style="background:var(--accent)"></i>direct（σ=0.2、1、2）</span><span><i style="background:var(--good)"></i>PG（σ=0.2、1、2）</span></div>
+  <h2>實驗二：RLCD 和 BCE 比較</h2>
+  <p class="muted">資料同實驗 2a，但 Few-NERD 只保留細類（RLCD 每個片段只能選一個類別）。兩種方法都從零開始訓練 12,000 步，3 個種子。下圖是亂抓率。</p>
+  <div class="chart"><svg id="fpr" viewBox="0 0 760 170" role="img" aria-label="BCE 與 RLCD 的亂抓率"></svg>
+    <div class="legend"><span><i style="background:var(--accent)"></i>BCE</span><span><i style="background:var(--rlcd)"></i>RLCD</span><span>細線＝±1 標準差</span></div>
   </div>
-</section>
-
-<section>
-  <h2>完整數字</h2>
   <div class="tbl"><table>
-    <thead><tr><th>實驗（BCE 組）</th><th>其他領域平均</th><th>CrossNER</th><th>MIT 電影</th><th>MIT 餐廳</th><th>亂抓率</th><th>信心誤差</th></tr></thead>
+    <thead><tr><th></th><th>ModernBERT BCE</th><th>ModernBERT RLCD</th><th>Qwen2.5 BCE</th><th>Qwen2.5 RLCD</th></tr></thead>
     <tbody>
-      <tr><td>0 只有 FiNERWeb（1 seed）</td><td>0.195</td><td>0.221</td><td>0.158</td><td>0.098</td><td>25%</td><td>0.44</td></tr>
-      <tr><td>1 ＋三份公開資料</td><td>0.427 ± 0.005</td><td>0.451</td><td>0.374</td><td class="best">0.357</td><td>19%</td><td class="best">0.14</td></tr>
-      <tr><td>2a ＋Qwen 網頁資料 25%</td><td>0.430 ± 0.014</td><td>0.460</td><td>0.384</td><td>0.328</td><td>22%</td><td>0.18</td></tr>
-      <tr><td>2b ＋Qwen 網頁資料 50%</td><td>0.424 ± 0.011</td><td>0.452</td><td>0.361</td><td>0.350</td><td>21%</td><td>0.18</td></tr>
-      <tr><td>4 同 2a，換成 Qwen2.5 雙向</td><td class="best">0.471 ± 0.016</td><td class="best">0.516</td><td class="best">0.424</td><td>0.298</td><td class="best">19%</td><td>0.18</td></tr>
-      <tr class="seeded"><td>3a 同 2a ＋種子資料 C</td><td>0.590 ± 0.009</td><td>0.595</td><td>0.570</td><td>0.585</td><td>9%</td><td>0.07</td></tr>
-      <tr class="seeded"><td>3b 同 2b ＋種子資料 C</td><td>0.586 ± 0.013</td><td>0.585</td><td>0.574</td><td>0.600</td><td>10%</td><td>0.08</td></tr>
-    </tbody>
-  </table></div>
-  <p class="note">綠色＝zero-shot 實驗中最好的值。亂抓率：句子裡沒有某個類別時，模型仍然輸出片段的比例。信心誤差：模型有輸出的片段中，預測機率和實際正確率的差距（ECE）。門檻和機率縮放只用訓練來源的驗證集決定。</p>
-
-  <div class="tbl"><table>
-    <thead><tr><th>各測試集 F1（BCE 組）</th><th>AI</th><th>文學</th><th>音樂</th><th>政治</th><th>科學</th><th>MIT 電影</th><th>MIT 餐廳</th></tr></thead>
-    <tbody>
-      <tr><td>0 只有 FiNERWeb</td><td>0.215</td><td>0.190</td><td>0.205</td><td>0.316</td><td>0.180</td><td>0.158</td><td>0.098</td></tr>
-      <tr><td>1 ＋三份公開資料</td><td>0.405</td><td>0.475</td><td>0.472</td><td>0.477</td><td>0.427</td><td>0.374</td><td class="best">0.357</td></tr>
-      <tr><td>2a ＋網頁資料 25%</td><td>0.454</td><td>0.477</td><td>0.458</td><td>0.477</td><td>0.433</td><td>0.384</td><td>0.328</td></tr>
-      <tr><td>4 Qwen2.5 雙向</td><td class="best">0.484</td><td class="best">0.520</td><td class="best">0.481</td><td class="best">0.599</td><td class="best">0.495</td><td class="best">0.424</td><td>0.298</td></tr>
-      <tr class="seeded"><td>3a ＋種子資料 C</td><td>0.560</td><td>0.621</td><td>0.617</td><td>0.642</td><td>0.533</td><td>0.570</td><td>0.585</td></tr>
+      <tr><td>訓練來源自己的測試</td><td>0.647 ± 0.005</td><td class="win">0.703 ± 0.002</td><td>0.720 ± 0.004</td><td class="win">0.746 ± 0.002</td></tr>
+      <tr><td>沒看過的領域平均</td><td>0.445 ± 0.002</td><td class="win">0.456 ± 0.010</td><td>0.485 ± 0.009</td><td class="win">0.488 ± 0.029</td></tr>
+      <tr><td>CrossNER</td><td class="win">0.471 ± 0.005</td><td>0.459 ± 0.029</td><td class="win">0.535 ± 0.008</td><td>0.508 ± 0.037</td></tr>
+      <tr><td>MIT 電影</td><td>0.405</td><td class="win">0.465</td><td>0.424</td><td class="win">0.454</td></tr>
+      <tr><td>MIT 餐廳</td><td>0.355</td><td class="win">0.431</td><td>0.296</td><td class="win">0.421</td></tr>
+      <tr><td>亂抓率</td><td>18%</td><td class="win">5%</td><td>18%</td><td class="win">7%</td></tr>
+      <tr><td>信心誤差</td><td>0.17</td><td class="win">0.16</td><td>0.21</td><td class="win">0.16</td></tr>
     </tbody>
   </table></div>
 
   <div class="tbl"><table>
-    <thead><tr><th>領域內測試 F1（BCE 組）</th><th>FiNERWeb</th><th>Few-NERD</th><th>Pile-NER</th><th>MASSIVE</th><th>網頁資料 A</th></tr></thead>
+    <thead><tr><th>各測試集 F1</th><th>AI</th><th>文學</th><th>音樂</th><th>政治</th><th>科學</th><th>MIT 電影</th><th>MIT 餐廳</th></tr></thead>
     <tbody>
-      <tr><td>0 只有 FiNERWeb</td><td class="best">0.807</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-      <tr><td>1 ＋三份公開資料</td><td>0.739</td><td>0.767</td><td>0.412</td><td>0.860</td><td>—</td></tr>
-      <tr><td>2a ＋網頁資料 25%</td><td>0.726</td><td>0.759</td><td>0.408</td><td>0.857</td><td>0.484</td></tr>
-      <tr><td>4 Qwen2.5 雙向</td><td>0.796</td><td class="best">0.806</td><td class="best">0.495</td><td class="best">0.863</td><td class="best">0.577</td></tr>
+      <tr><td>ModernBERT BCE</td><td>0.453</td><td class="win">0.496</td><td>0.466</td><td class="win">0.494</td><td>0.443</td><td>0.405</td><td>0.355</td></tr>
+      <tr><td>ModernBERT RLCD</td><td class="win">0.459</td><td>0.419</td><td class="win">0.499</td><td>0.453</td><td class="win">0.464</td><td class="win">0.465</td><td class="win">0.431</td></tr>
+      <tr><td>Qwen2.5 BCE</td><td class="win">0.517</td><td class="win">0.536</td><td class="win">0.499</td><td>0.616</td><td class="win">0.508</td><td>0.424</td><td>0.296</td></tr>
+      <tr><td>Qwen2.5 RLCD</td><td>0.432</td><td>0.520</td><td>0.475</td><td class="win">0.628</td><td>0.484</td><td class="win">0.454</td><td class="win">0.421</td></tr>
     </tbody>
   </table></div>
 
   <div class="tbl"><table>
-    <thead><tr><th>spherical score 消融（實驗 2a）</th><th>direct σ=0.2</th><th>PG σ=0.2</th><th>direct σ=1</th><th>PG σ=1</th><th>direct σ=2</th><th>PG σ=2</th></tr></thead>
+    <thead><tr><th>訓練來源自己的測試</th><th>FiNERWeb</th><th>Few-NERD</th><th>Pile-NER</th><th>MASSIVE</th><th>網頁文字</th></tr></thead>
     <tbody>
-      <tr><td>只用 log score</td><td>0.433</td><td>0.428</td><td>0.429</td><td>0.431</td><td>0.430</td><td>0.434</td></tr>
-      <tr><td>＋0.1 × spherical</td><td>0.429</td><td>0.432</td><td>0.428</td><td>0.431</td><td>0.433</td><td>0.429</td></tr>
+      <tr><td>ModernBERT BCE</td><td>0.735</td><td>0.726</td><td>0.413</td><td>0.866</td><td>0.495</td></tr>
+      <tr><td>ModernBERT RLCD</td><td class="win">0.787</td><td class="win">0.733</td><td class="win">0.517</td><td class="win">0.876</td><td class="win">0.602</td></tr>
+      <tr><td>Qwen2.5 BCE</td><td>0.814</td><td class="win">0.792</td><td>0.519</td><td>0.875</td><td>0.602</td></tr>
+      <tr><td>Qwen2.5 RLCD</td><td class="win">0.840</td><td>0.785</td><td class="win">0.564</td><td class="win">0.901</td><td class="win">0.640</td></tr>
     </tbody>
   </table></div>
-</section>
 
-<section>
-  <h2>怎麼解讀</h2>
   <ul>
-    <li><b>RL 沒有幫助，而且理論上本來就不該有。</b>在分數上加小雜訊後，log score 的期望值大約等於負的 BCE 再減一個很小的項；direct 和 PG 都只是「BCE 再多一點點」，PG 還多了抽樣雜訊。雜訊加大到 σ=2 也一樣。</li>
-    <li><b>Qwen 找出的 70 萬個「不存在」負例沒有降低亂抓率</b>（19% → 21–22%）。它們多半是隨機抽的類型，太容易分辨；真正的錯誤是相近類型的混淆，例如人物和政治人物。</li>
-    <li><b>種子資料 C 的巨大提升</b>（0.43 → 0.59）說明主要瓶頸是目標領域的類別定義和標註習慣。這個數字不能當 zero-shot 結果引用。</li>
-    <li><b>混入其他資料會稍微傷到 FiNERWeb 自己</b>（0.81 → 0.74）；Qwen2.5 幾乎補回來，但 MIT 餐廳反而變差。</li>
+    <li><b>亂抓大幅減少</b>：每個片段要在各類別和「不是實體」之間做選擇，類別之間會互相競爭，不再各自說「是」。</li>
+    <li><b>MIT 兩個測試集和訓練來源自己的測試都明顯變好。</b></li>
+    <li><b>CrossNER 有好有壞</b>：文學、政治（ModernBERT）和 AI（Qwen2.5）下降，其他上升；RLCD 在 CrossNER 上三個種子之間差異（±0.03）比 BCE 大很多，目前還不能說它在 CrossNER 上較好或較差。</li>
   </ul>
 </section>
 
 <section>
   <h2>限制</h2>
   <ul class="note">
-    <li>warm-up 在 10,000 步時驗證分數仍在上升，所有分叉都從還沒練完的起點出發。</li>
-    <li>超過 512 個 token 的文字被丟掉（Pile 687 段、網頁資料 17 段；Qwen2.5 切字時再丟 Pile 130 段），長文分窗還沒實作。沒有做語言偵測。</li>
-    <li>Pile-NER 沒有字元位置，以詞邊界上的所有出現位置對齊；對不上的類別設為未知。</li>
-    <li>實驗 0 只有一個 seed；CrossNER 每個領域的測試集只有 400–650 句。</li>
+    <li>超過 512 個 token 的文字被丟掉（長文分段還沒實作）：Pile-NER 687 段、網頁文字 17 段；用 Qwen2.5 切字時 Pile 再多丟 130 段。沒有做語言偵測。</li>
+    <li>Pile-NER 沒有字元位置，是用所有出現位置對齊；對不上的類別當成「不確定」。</li>
+    <li>一個片段有多個正確類別時（偶爾出現），RLCD 把這些類別的機率加總當目標；參考文章沒有處理這種情況。</li>
+    <li>實驗 0 只有一個種子；CrossNER 每個領域的測試集只有 400–650 句。</li>
   </ul>
 </section>
 
 <section>
   <h2>建議的下一步</h2>
   <ul>
-    <li>把 warm-up 延長到 20,000–30,000 步，確認結論在模型練好後仍然成立。</li>
-    <li>改用雙向 Qwen2.5 當主模型。RL 分支可以停在這裡，或改用真正不可微分的獎勵（例如片段級 F1），那才是 PG 可能有優勢的地方。</li>
-    <li>網頁資料的負例改成「容易混淆的相近類型」，而不是隨機抽樣。</li>
-    <li>試「只給類別說明、不給範例句」的生成方式，看能保留多少種子資料的提升，同時更接近 zero-shot。</li>
+    <li>RLCD 在 CrossNER 上種子之間差很多：多跑幾個種子，並分析 CrossNER 上是漏抓變多還是類別選錯。</li>
+    <li>以雙向 Qwen2.5 ＋ RLCD 為主模型，延長訓練步數。</li>
+    <li>試「只給類別說明、不給例句」的生成方式，看能保留多少生成資料的提升，同時更接近 zero-shot。</li>
   </ul>
 </section>
 
-<footer>模型：ModernBERT-base 與雙向 Qwen2.5-0.5B；資料生成：Qwen3.8-27B（vLLM，最多 48 張 GH200 同時執行）。每個數字都是 3 個 seed（42、43、44）的平均，實驗 0 除外。完整報告與程式在 ie-rlcd repo 的 reports/2026-09-28-round1-experiments.md。</footer>
+<footer>模型：ModernBERT-base 與雙向 Qwen2.5-0.5B；資料生成：Qwen3.8-27B。每個數字是 3 個種子（42、43、44）的平均，實驗 0 除外。本版不再列出 SPEC 原本的高斯 PG 分支：它和參考文章的 RLCD 不同，結果也和 BCE 沒有差別。完整報告在 ie-rlcd repo 的 reports/2026-09-28-round1-experiments.md。</footer>
 </div>
 
 <script>
@@ -179,78 +202,47 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
     var e = document.createElementNS(NS, tag);
     for (var k in attrs) {
       var v = attrs[k];
-      // theme tokens go through style so a theme switch recolors the chart
       if (typeof v === "string" && v.indexOf("var(") === 0) e.style.setProperty(k, v);
       else e.setAttribute(k, v);
     }
     if (text != null) e.textContent = text;
     parent.appendChild(e); return e;
   }
-  function tok(n) { return "var(" + n + ")"; }
-
-  // bar chart: OOD macro F1 of the BCE arm, mean ± std over seeds
-  var bars = [
-    ["0 只有 FiNERWeb", 0.195, 0, false],
-    ["1 ＋三份公開資料", 0.427, 0.005, false],
-    ["2a ＋網頁資料 25%", 0.430, 0.014, false],
-    ["2b ＋網頁資料 50%", 0.424, 0.011, false],
-    ["4 Qwen2.5 雙向", 0.471, 0.016, false],
-    ["3a ＋種子資料 C", 0.590, 0.009, true],
-    ["3b ＋種子資料 C", 0.586, 0.013, true]
-  ];
-  var svg = document.getElementById("bars");
-  var L = 170, R = 700, top = 16, rowH = 42, max = 0.7;
-  function x(v) { return L + (R - L) * v / max; }
-  [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].forEach(function (t) {
-    el("line", { x1: x(t), x2: x(t), y1: top, y2: top + rowH * bars.length, stroke: tok("--grid"), "stroke-width": 1 }, svg);
-    el("text", { x: x(t), y: top + rowH * bars.length + 18, "text-anchor": "middle" }, svg, t.toFixed(1));
-  });
-  bars.forEach(function (b, i) {
-    var y = top + i * rowH + 8, h = 24, color = b[3] ? tok("--amber") : tok("--accent");
-    el("text", { x: L - 10, y: y + 17, "text-anchor": "end", class: "lab" }, svg, b[0]);
-    el("rect", { x: L, y: y, width: x(b[1]) - L, height: h, rx: 3, fill: color, opacity: 0.9 }, svg);
-    if (b[2] > 0) {
-      el("line", { x1: x(b[1] - b[2]), x2: x(b[1] + b[2]), y1: y + h / 2, y2: y + h / 2, stroke: tok("--ink"), "stroke-width": 1.5 }, svg);
-      [b[1] - b[2], b[1] + b[2]].forEach(function (v) {
-        el("line", { x1: x(v), x2: x(v), y1: y + 6, y2: y + h - 6, stroke: tok("--ink"), "stroke-width": 1.5 }, svg);
-      });
-    }
-    el("text", { x: x(b[1] + b[2]) + 8, y: y + 17, class: "val" }, svg, b[1].toFixed(3));
-  });
-  el("text", { x: (L + R) / 2, y: top + rowH * bars.length + 36, "text-anchor": "middle" }, svg, "其他領域平均 F1");
-
-  // dot chart: every arm of every experiment on one common axis
-  var arms = ["warmup", "bce", "bce×1.1", "direct 0.2", "pg 0.2", "direct 1", "pg 1", "direct 2", "pg 2"];
-  var kind = [0, 0, 0, 1, 2, 1, 2, 1, 2];
-  var rows = [
-    ["0 只有 FiNERWeb", [0.1825, 0.1946, 0.1961, 0.1901, 0.1999, 0.1881, 0.1938, 0.1933, 0.1909], 0, false],
-    ["1 ＋三份公開資料", [0.4173, 0.4266, 0.4262, 0.4261, 0.4206, 0.4307, 0.4261, 0.4283, 0.4222], 0.0049, false],
-    ["2a ＋網頁資料 25%", [0.4183, 0.4301, 0.4302, 0.4334, 0.4282, 0.4291, 0.4313, 0.4299, 0.4343], 0.0136, false],
-    ["2b ＋網頁資料 50%", [0.4043, 0.4242, 0.4240, 0.4243, 0.4184, 0.4205, 0.4216, 0.4194, 0.4254], 0.0105, false],
-    ["4 Qwen2.5 雙向", [0.4788, 0.4713, 0.4738, 0.4788, 0.4719, 0.4672, 0.4676, 0.4724, 0.4644], 0.0157, false],
-    ["3a ＋種子資料 C", [0.5626, 0.5898, 0.5879, 0.5918, 0.5914, 0.5902, 0.5919, 0.5898, 0.5911], 0.0092, true],
-    ["3b ＋種子資料 C", [0.5628, 0.5858, 0.5854, 0.5860, 0.5867, 0.5847, 0.5862, 0.5879, 0.5863], 0.0133, true]
-  ];
-  var d = document.getElementById("dots");
-  var lo = 0.15, hi = 0.65;
-  function xd(v) { return L + (R - L) * (v - lo) / (hi - lo); }
-  [0.2, 0.3, 0.4, 0.5, 0.6].forEach(function (t) {
-    el("line", { x1: xd(t), x2: xd(t), y1: top, y2: top + rowH * rows.length, stroke: tok("--grid"), "stroke-width": 1 }, d);
-    el("text", { x: xd(t), y: top + rowH * rows.length + 18, "text-anchor": "middle" }, d, t.toFixed(1));
-  });
-  var colors = [tok("--muted"), tok("--accent"), tok("--good")];
-  rows.forEach(function (r, i) {
-    var y = top + i * rowH + 20;
-    el("text", { x: L - 10, y: y + 5, "text-anchor": "end", class: "lab" }, d, r[0]);
-    if (r[2] > 0) {
-      el("rect", { x: xd(r[1][1] - r[2]), y: y - 11, width: xd(r[1][1] + r[2]) - xd(r[1][1] - r[2]), height: 22, rx: 4,
-        fill: r[3] ? tok("--amber-soft") : tok("--accent-soft") }, d);
-    }
-    r[1].forEach(function (v, k) {
-      var c = el("circle", { cx: xd(v), cy: y + (k % 3 - 1) * 5, r: 4.2, fill: colors[kind[k]], stroke: tok("--surface"), "stroke-width": 1 }, d);
-      el("title", {}, c, arms[k] + "：" + v.toFixed(3));
+  function bars(svgId, rows, max, ticks, fmtTick, fmt, axisLabel) {
+    var svg = document.getElementById(svgId);
+    var L = 190, R = 700, top = 12, rowH = 34;
+    function x(v) { return L + (R - L) * v / max; }
+    var H = top + rowH * rows.length;
+    ticks.forEach(function (t) {
+      el("line", { x1: x(t), x2: x(t), y1: top, y2: H, stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: x(t), y: H + 16, "text-anchor": "middle" }, svg, fmtTick(t));
     });
-  });
-  el("text", { x: (L + R) / 2, y: top + rowH * rows.length + 36, "text-anchor": "middle" }, d, "其他領域平均 F1（每個點是一種訓練方式）");
+    rows.forEach(function (b, i) {
+      var y = top + i * rowH + 6, h = 20;
+      el("text", { x: L - 10, y: y + 15, "text-anchor": "end", class: "lab" }, svg, b[0]);
+      el("rect", { x: L, y: y, width: Math.max(1, x(b[1]) - L), height: h, rx: 3, fill: b[3] }, svg);
+      if (b[2] > 0) {
+        el("line", { x1: x(b[1] - b[2]), x2: x(b[1] + b[2]), y1: y + h / 2, y2: y + h / 2, stroke: "var(--ink)", "stroke-width": 1.5 }, svg);
+      }
+      el("text", { x: x(b[1] + b[2]) + 8, y: y + 15, class: "val" }, svg, fmt(b[1]));
+    });
+    el("text", { x: (L + R) / 2, y: H + 34, "text-anchor": "middle" }, svg, axisLabel);
+  }
+  bars("bars", [
+    ["0 只有 FiNERWeb", 0.195, 0, "var(--accent)"],
+    ["1 ＋三份公開資料", 0.427, 0.005, "var(--accent)"],
+    ["2a ＋網頁文字 25%", 0.430, 0.014, "var(--accent)"],
+    ["2b ＋網頁文字 50%", 0.424, 0.011, "var(--accent)"],
+    ["4 換成 Qwen2.5", 0.471, 0.016, "var(--accent)"],
+    ["3a ＋生成資料（非 zero-shot）", 0.590, 0.009, "var(--amber)"]
+  ], 0.7, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7], function (v) { return v.toFixed(1); },
+     function (v) { return v.toFixed(3); }, "沒看過的領域平均 F1");
+  bars("fpr", [
+    ["ModernBERT BCE", 0.184, 0.020, "var(--accent)"],
+    ["ModernBERT RLCD", 0.050, 0.002, "var(--rlcd)"],
+    ["Qwen2.5 BCE", 0.180, 0.006, "var(--accent)"],
+    ["Qwen2.5 RLCD", 0.072, 0.004, "var(--rlcd)"]
+  ], 0.25, [0, 0.05, 0.10, 0.15, 0.20, 0.25], function (v) { return Math.round(v * 100) + "%"; },
+     function (v) { return (v * 100).toFixed(1) + "%"; }, "亂抓率（越低越好）");
 })();
 </script>

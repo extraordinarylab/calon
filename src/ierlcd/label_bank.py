@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"   # v2: coarse labels see their subcategory names (ontology only)
 SOURCE_CONTEXT = {
     "fewnerd": ("a fine-grained named entity recognition dataset over English Wikipedia text, "
                 "with 8 coarse entity categories and 66 fine-grained subcategories"),
@@ -40,9 +40,16 @@ def main():
 
     inventory = json.loads(Path(args.inventory).read_text())
     items = [(src, lab) for src, labs in inventory.items() for lab in labs]
+    children = {}
+    for src, lab in items:
+        if lab.get("parent"):
+            children.setdefault((src, lab["parent"]), []).append(lab["name"])
     prompts = []
     for src, lab in items:
         parent = f'\nParent category: "{lab["parent"]}"' if lab.get("parent") else ""
+        subs = children.get((src, lab["name"]))
+        if subs:
+            parent += "\nSubcategories: " + ", ".join(f'"{s}"' for s in subs)
         prompts.append([{"role": "system", "content": SYSTEM},
                         {"role": "user", "content": TEMPLATE.format(
                             context=SOURCE_CONTEXT[src], name=lab["name"], parent=parent)}])

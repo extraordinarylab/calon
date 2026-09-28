@@ -5,24 +5,18 @@
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=64
-# Round-1 mixture: BCE warm-up (1 GPU), 8 forks from its best checkpoint
-# (2 waves x 4 GPUs), pooled-dev calibration and zero-shot OOD eval of every
-# checkpoint, then a compact summary file.
+# Job B of the round-1 mixture (after run_mix_warmup.sh): 8 forks from the
+# warm-up's best checkpoint (2 waves x 4 GPUs), pooled-dev calibration and
+# zero-shot OOD eval of every checkpoint, then a compact summary file.
 set -euo pipefail
 source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 SEED=${SEED:-42}
-UPDATES=${UPDATES:-10000}
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 MIX=$ROOT/data/mix
 RUNS=$ROOT/runs/mix-s$SEED
-mkdir -p $RUNS
-git rev-parse HEAD > $RUNS/git_commit.txt
-
-CUDA_VISIBLE_DEVICES=0 python -m ierlcd.train --data $MIX --out $RUNS/warmup --mode bce \
-  --updates $UPDATES --eval_every 500 --workers 48 --seed $SEED > $RUNS/warmup.log 2>&1
 INIT=$RUNS/warmup/best.pt
 
 ARMS=("bce 0.2" "bce_scaled 0.2" "direct 0.2" "pg 0.2" "direct 1.0" "pg 1.0" "direct 2.0" "pg 2.0")

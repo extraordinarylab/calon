@@ -36,6 +36,11 @@ def parse(answer, text, labels):
             continue
         typ, word = part.split(":", 1)
         lab, word = by_lower.get(typ.strip().lower()), word.strip()
+        # the model often copies a trailing comma / period / quote ("Rural England,")
+        # a final period is kept in abbreviations such as "U.S."
+        word = word.rstrip(",;:'\" ") or word
+        if word.endswith(".") and word.count(".") == 1:
+            word = word[:-1].rstrip() or word
         if lab and word:
             out |= {(a, b, lab) for a, b in find_all(text, word)}
     return out

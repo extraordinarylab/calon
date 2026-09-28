@@ -32,7 +32,10 @@ srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir
   --rdzv_endpoint=$MASTER:29500 -m ierlcd.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
   --encoder $ENCODER --head $HEAD --fewnerd_fine_only --desc_dropout $DDROP --mode bce \
   --batch 128 --micro 8 --updates $UPDATES --enc_lr 4e-5 --head_lr 2e-4 --eval_every 500 \
-  --workers 12 --seed $SEED" > $RUNS/$NAME.log 2>&1
+  --workers 12 --seed $SEED" > $RUNS/$NAME.log 2>&1 || {
+  # a rendezvous error while ranks shut down must not skip evaluation of a saved model
+  grep -q "^done " $RUNS/$NAME.log && [ -s $RUNS/$NAME/final.pt ] || exit 1
+  echo "srun exited non-zero after training finished; continuing"; }
 grep -E "EVAL|done" $RUNS/$NAME.log | tail -2 | cut -c1-250
 python -m ierlcd.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD \
   --fewnerd_fine_only --ckpt $RUNS/$NAME/best.pt --out $RUNS/$NAME/calibration.json \

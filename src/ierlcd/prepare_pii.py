@@ -35,17 +35,17 @@ def readable(code):
 
 
 def build(args):
-    import pyarrow.parquet as pq
     from huggingface_hub import HfApi, hf_hub_download
     api = HfApi()
     info = api.dataset_info(REPO)
-    files = sorted(f for f in api.list_repo_files(REPO, repo_type="dataset", revision=info.sha)
-                   if f.endswith(".parquet") and "valid" in f.lower())
-    rows, stats = [], collections.Counter()
+    files = ["data/validation.jsonl"]        # the repo ships jsonl only
+    rows, stats, langs = [], collections.Counter(), collections.Counter()
     for f in files:
         path = hf_hub_download(REPO, f, repo_type="dataset", revision=info.sha, cache_dir=str(ROOT / "raw/hf"))
-        for rec in pq.read_table(path).to_pylist():
+        for line in open(path):
+            rec = json.loads(line)
             lang = str(rec.get("language", "")).lower()
+            langs[lang] += 1
             if lang not in ("en", "english"):
                 continue
             text, mask = rec["source_text"], rec["privacy_mask"]
@@ -62,9 +62,10 @@ def build(args):
                 stats["offset_mismatch_rows"] += 1
                 continue
             rows.append({"uid": rec.get("uid"), "text": text, "ents": ents})
+            if len(rows) >= args.n * 5:
+                break
         stats["english_rows_seen"] = len(rows)
-        if len(rows) >= args.n * 5:
-            break
+    stats["top_languages"] = str(langs.most_common(5))
     rng = random.Random(args.seed)
     rng.shuffle(rows)
     rows = rows[:args.n]

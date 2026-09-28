@@ -150,6 +150,11 @@ def main():
                 (loss * n_act * world / n_total).backward()
             for k, v in stats.items():
                 stats_acc[k] = stats_acc.get(k, 0.0) + v * n_act / n_total
+        if world > 1:                           # logged stats: sum of every rank's share
+            keys = ("clean_bce", "mean_reward", "auxiliary")
+            t = torch.tensor([stats_acc.get(k, 0.0) for k in keys], device=device)
+            dist.all_reduce(t)
+            stats_acc = {k: v for k, v in zip(keys, t.tolist()) if k in stats_acc}
         gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
         opt.step()
         sched.step()

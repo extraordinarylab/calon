@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
     ap.add_argument("--fewnerd_fine_only", action="store_true")
+    ap.add_argument("--decode", default="label", choices=["label", "entity"])
     args = ap.parse_args()
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
@@ -74,7 +75,7 @@ def main():
 
     def view(o, T):
         """(rows, divisor) for metrics: RLCD rescales utilities before the softmax."""
-        return (with_temperature(o, T), 1.0) if rlcd else (o, T)
+        return (with_temperature(o, T, args.decode), 1.0) if rlcd else (o, T)
 
     if rlcd:   # RLCD: temperature minimizing multiway Brier on dev_calib (the blog's recipe)
         grid = np.exp(np.linspace(np.log(0.25), np.log(4.0), 57))
@@ -104,7 +105,8 @@ def main():
         thr = thr_raw if name == "raw" else thr_cal
         sel = p >= thr
         if rlcd:
-            sel &= np.concatenate([o["choice"][o["valid"]] for o in rows])
+            dz = np.concatenate([o["dz"][o["valid"]] for o in rows])
+            sel = (1 / (1 + np.exp(-dz)) >= thr) & np.concatenate([o["choice"][o["valid"]] for o in rows])
         res[f"test_reliability_{name}_predicted"] = reliability(p[sel], yt[sel])
     Path(args.out).write_text(json.dumps(res, indent=2))
     print("T", round(T, 3), "thr_raw", thr_raw, "thr_cal", thr_cal)

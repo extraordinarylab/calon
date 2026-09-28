@@ -43,9 +43,14 @@ def rlcd_probs(o, T):
     return p / p.sum(0, keepdims=True)
 
 
-def with_temperature(outs, T):
+def with_temperature(outs, T, decode="label"):
     """RLCD rows -> binary-decision view: z = logit(p_label), choice = the span's
-    most likely label. Decoding keeps a label only where choice is set."""
+    most likely label. Decoding keeps a label only where choice is set and the
+    decision score `dz` clears the threshold:
+      label   dz = logit(p_label)       (the chosen label's own probability)
+      entity  dz = logit(1 - p_none)    (probability that the span is an entity
+              at all; the label is then the most likely one, so mass split
+              between near-synonymous labels no longer suppresses the span)"""
     res = []
     for o in outs:
         p = rlcd_probs(o, T)
@@ -54,7 +59,13 @@ def with_temperature(outs, T):
         if pl.size:
             best = pl.argmax(0)
             choice[best, np.arange(pl.shape[1])] = True
-        res.append({**o, "z": np.log(pl) - np.log1p(-pl), "choice": choice, "p_none": p[0], "T": T})
+        z = np.log(pl) - np.log1p(-pl)
+        if decode == "entity":
+            pe = np.clip(1 - p[0], 1e-12, 1 - 1e-12)
+            dz = np.broadcast_to(np.log(pe) - np.log1p(-pe), z.shape).copy()
+        else:
+            dz = z
+        res.append({**o, "z": z, "dz": dz, "choice": choice, "p_none": p[0], "T": T})
     return res
 
 
@@ -93,7 +104,7 @@ def f1_counts(encs, outs, threshold_logit):
     for e, o in zip(encs, outs):
         # only supervised queries are scored; FiNERWeb has no unknown queries
         keep = {lab for lab, sup in zip(e["labels"], e["supervised"]) if sup}
-        pred = {p for p in decode(e, o["z"], threshold_logit, o.get("choice")) if p[2] in keep}
+        pred = {p for p in decode(e, o.get("dz", o["z"]), threshold_logit, o.get("choice")) if p[2] in keep}
         gold = {g for g in e["gold_spans"] if g[2] in keep}
         tp += len(pred & gold)
         fp += len(pred - gold)
@@ -142,7 +153,8 @@ def metrics(encs, outs, temperature=1.0, threshold=0.5):
     pred = prob >= threshold
     rlcd = bool(outs) and "choice" in outs[0]
     if rlcd:                                  # only the span's chosen label is a prediction
-        pred &= np.concatenate([o["choice"][o["valid"]] for o in outs])
+        dz = np.concatenate([o["dz"][o["valid"]] for o in outs])
+        pred = (dz >= thr_logit) & np.concatenate([o["choice"][o["valid"]] for o in outs])
     gold = sum(len(e["gold_spans"]) for e in encs)
     res.update({
         "nll_row_mean": float(np.mean(row_nll)),

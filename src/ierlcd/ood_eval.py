@@ -26,7 +26,7 @@ def per_query(encs, outs, T, threshold):
     counts = collections.defaultdict(lambda: [0, 0, 0])
     absent_q = absent_fp = 0
     for e, o in zip(encs, outs):
-        pred = decode(e, o["z"], thr_logit, o.get("choice"))
+        pred = decode(e, o.get("dz", o["z"]), thr_logit, o.get("choice"))
         for m, lab in enumerate(e["labels"]):
             p = {x for x in pred if x[2] == lab}
             g = {x for x in e["gold_spans"] if x[2] == lab}
@@ -53,7 +53,7 @@ def error_breakdown(encs, outs, T, threshold):
     thr_logit = T * float(np.log(threshold / (1 - threshold)))
     fp, fn = collections.Counter(), collections.Counter()
     for e, o in zip(encs, outs):
-        pred = decode(e, o["z"], thr_logit, o.get("choice"))
+        pred = decode(e, o.get("dz", o["z"]), thr_logit, o.get("choice"))
         gold = e["gold_spans"]
         gold_spans = {(s, t) for s, t, _ in gold}
         pred_spans = {(s, t) for s, t, _ in pred}
@@ -88,6 +88,8 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--name_only", action="store_true")
     ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
+    ap.add_argument("--decode", default="label", choices=["label", "entity"],
+                    help="RLCD: threshold the chosen label's probability or 1 - p(none)")
     args = ap.parse_args()
     cal = json.loads(Path(args.calibration).read_text())
     T = cal["temperature"]
@@ -115,7 +117,8 @@ def main():
         r = {}
         for key, (t, thr) in settings.items():
             # RLCD rescales utilities before its softmax; BCE divides logits by t
-            o_t, t = (with_temperature(outs, t), 1.0) if args.head == "rlcd" else (outs, t)
+            o_t, t = ((with_temperature(outs, t, args.decode), 1.0) if args.head == "rlcd"
+                      else (outs, t))
             m = metrics(encs, o_t, t, thr)
             counts, absent = per_query(encs, o_t, t, thr)
             per_label = {lab: f1(*c) for lab, c in counts.items()}

@@ -69,6 +69,19 @@ def test_log_probs_mask_unqueried_labels():
     assert torch.allclose(lp[0, :2].exp().sum(0), torch.ones(2))
 
 
+def test_entity_decode_recovers_split_mass():
+    # "Stephen King": person 0.45, writer 0.45, none 0.10
+    u = np.log(np.array([[0.10], [0.45], [0.45]]))
+    o = {"u": u, "known": np.array([True, True]), "y": np.zeros((2, 1)),
+         "valid": np.ones((2, 1), bool), "unknown_row": False}
+    e = {"cands": [(0, 12, 0, 1)], "labels": ["person", "writer"]}
+    thr = np.log(0.5 / 0.5)
+    (lab,) = with_temperature([o], 1.0, "label")
+    (ent,) = with_temperature([o], 1.0, "entity")
+    assert decode(e, lab["dz"], thr, lab["choice"]) == set()          # 0.45 < 0.5
+    assert len(decode(e, ent["dz"], thr, ent["choice"])) == 1         # 0.90 >= 0.5, one label
+
+
 def test_decode_keeps_one_label_per_span():
     o = {"u": np.array([[0.0, 0.0], [2.0, -1.0], [1.9, 3.0]]), "known": np.array([True, True]),
          "y": np.zeros((2, 2)), "valid": np.ones((2, 2), bool), "unknown_row": False}

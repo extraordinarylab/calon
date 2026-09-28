@@ -1,0 +1,79 @@
+"""Source-mixture sampling and lazy per-step encoding (SPEC 2.5).
+
+Each update draws a source family by probability, then a train row uniformly,
+then its query subset (prepare_mix.sample_queries). The whole step schedule
+comes from one seeded RNG in the main process, so every arm sees the same rows
+and queries; DataLoader workers only tokenize and collate.
+"""
+import collections
+import json
+import random
+from pathlib import Path
+
+import torch
+
+from .collator import encode_row
+from .prepare_mix import sample_queries
+
+
+def load_interned(path):
+    """Rows with identical query dicts shared (Few-NERD has 74 per row)."""
+    pool, rows = {}, []
+    with open(path) as f:
+        for line in f:
+            r = json.loads(line)
+            r["queries"] = [pool.setdefault(tuple(sorted(q.items())), q) for q in r["queries"]]
+            rows.append(r)
+    return rows
+
+
+def parse_mix(spec):
+    out = {}
+    for part in spec.split(","):
+        name, p = part.split(":")
+        out[name] = float(p)
+    total = sum(out.values())
+    return {k: v / total for k, v in out.items()}
+
+
+def step_schedule(sizes, mix, updates, batch, seed):
+    rng = random.Random(seed)
+    names, probs = list(mix), [mix[n] for n in mix]
+    steps = []
+    for _ in range(updates):
+        srcs = rng.choices(names, probs, k=batch)
+        steps.append([(s, rng.randrange(sizes[s]), rng.getrandbits(48)) for s in srcs])
+    return steps
+
+
+class StepDataset(torch.utils.data.Dataset):
+    def __init__(self, rows, steps, tokenizer, collate, W, micro):
+        self.rows, self.steps, self.tok = rows, steps, tokenizer
+        self.collate, self.W, self.micro = collate, W, micro
+
+    def __len__(self):
+        return len(self.steps)
+
+    def __getitem__(self, k):
+        encs, stats = [], collections.Counter()
+        for src, idx, qseed in self.steps[k]:
+            row = dict(self.rows[src][idx])
+            row["queries"] = sample_queries(row["queries"], random.Random(qseed))
+            for q in row["queries"]:
+                stats[f"{src}/{q['status']}"] += 1
+                stats[f"desc/{'with' if q['description'] else 'name_only'}"] += 1
+            stats[f"rows/{src}"] += 1
+            encs.append(encode_row(row, self.tok, self.W))
+        # group similar lengths into microbatches to limit padding
+        encs.sort(key=lambda e: len(e["cands"]) * max(1, len(e["labels"])))
+        micro = [self.collate(encs[i:i + self.micro]) for i in range(0, len(encs), self.micro)]
+        return micro, dict(stats)
+
+
+def load_eval(data, split, sources, tok, W, limit):
+    out = {}
+    for src in sources:
+        path = Path(data) / src / f"{split}.jsonl"
+        rows = [json.loads(line) for line in open(path)][:limit]
+        out[src] = [encode_row(r, tok, W) for r in rows]
+    return out

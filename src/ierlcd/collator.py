@@ -3,7 +3,7 @@ import json
 
 import torch
 
-from .alignment import MAX_TEXT_TOKENS, build_candidates, tokenize_text
+from .alignment import MAX_TEXT_TOKENS, build_candidates_np, tokenize_text
 
 LABEL_TOKEN, TEXT_TOKEN = "<LABEL>", "<TEXT>"
 SCHEMA_BUDGET, TOTAL_BUDGET = 1500, 2048
@@ -24,7 +24,7 @@ def encode_row(row, tokenizer, W):
     if len(text_ids) > MAX_TEXT_TOKENS:
         raise NotImplementedError(
             f"{row['id']}: {len(text_ids)} text tokens; windowing (SPEC 3) not implemented yet")
-    cands = build_candidates(row["text"], offsets, W)
+    cands = build_candidates_np(row["text"], offsets, W)
     index = {(s, e): c for c, (s, e, _, _) in enumerate(cands)}
     label_ids = [tokenizer(label_string(q), add_special_tokens=False)["input_ids"]
                  for q in row["queries"]]
@@ -34,7 +34,8 @@ def encode_row(row, tokenizer, W):
     gold = [[] for _ in row["queries"]]
     qidx = {q["label"]: m for m, q in enumerate(row["queries"])}
     unrepresented = 0
-    for ent in row["entities"]:
+    entities = [e for e in row["entities"] if e["label"] in qidx]   # queries may be a subset
+    for ent in entities:
         c = index.get((ent["start"], ent["end"]))
         if c is None:
             unrepresented += 1
@@ -44,7 +45,7 @@ def encode_row(row, tokenizer, W):
         "id": row["id"], "text": row["text"], "text_ids": text_ids, "label_ids": label_ids,
         "cands": cands, "labels": [q["label"] for q in row["queries"]],
         "supervised": [q["status"] in STATUS_SUPERVISED for q in row["queries"]],
-        "gold": gold, "gold_spans": {(e["start"], e["end"], e["label"]) for e in row["entities"]},
+        "gold": gold, "gold_spans": {(e["start"], e["end"], e["label"]) for e in entities},
         "unrepresented": unrepresented,
     }
 

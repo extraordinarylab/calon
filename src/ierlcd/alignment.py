@@ -1,6 +1,39 @@
 """Token-span candidates mapped back to character offsets (SPEC 3)."""
+import numpy as np
 
 MAX_TEXT_TOKENS = 512
+
+
+def build_candidates_np(text, offsets, W):
+    """Vectorized build_candidates with identical output (see tests)."""
+    n = len(offsets)
+    if n == 0:
+        return []
+    L = len(text)
+    space = np.array([c.isspace() for c in text], dtype=bool)
+    # next_ns[c]: first non-space index >= c ; prev_ns[c]: (last non-space index < c) + 1
+    idx = np.arange(L + 1)
+    ns = np.where(~space[:L], idx[:L], L)
+    next_ns = np.minimum.accumulate(np.append(ns, L)[::-1])[::-1]
+    last = np.where(~space[:L], idx[:L] + 1, 0)
+    prev_ns = np.concatenate([[0], np.maximum.accumulate(last)])
+    off = np.asarray(offsets, dtype=np.int64).reshape(n, 2)
+    i = np.repeat(np.arange(n), W)
+    j = i + np.tile(np.arange(W), n)
+    keep = j < n
+    i, j = i[keep], j[keep]
+    s = next_ns[off[i, 0]]
+    e = prev_ns[off[j, 1]]
+    ok = s < e
+    s, e, i, j = s[ok], e[ok], i[ok], j[ok]
+    # per (s, e) keep min (j - i, i, j)
+    order = np.lexsort((j, i, j - i, e, s))
+    s, e, i, j = s[order], e[order], i[order], j[order]
+    first = np.ones(len(s), dtype=bool)
+    first[1:] = (s[1:] != s[:-1]) | (e[1:] != e[:-1])
+    s, e, i, j = s[first], e[first], i[first], j[first]
+    order = np.lexsort((j, i))
+    return list(zip(s[order].tolist(), e[order].tolist(), i[order].tolist(), j[order].tolist()))
 
 
 def build_candidates(text, offsets, W):

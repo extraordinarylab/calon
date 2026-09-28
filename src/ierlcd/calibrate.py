@@ -41,7 +41,9 @@ def best_threshold(encs, outs, T):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", required=True)
+    ap.add_argument("--data", required=True, help="prepare_mix directory")
+    ap.add_argument("--sources", default="finerweb,fewnerd,pile,massive")
+    ap.add_argument("--limit", type=int, default=1000, help="rows per source and split")
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--encoder", default="answerdotai/ModernBERT-base")
     ap.add_argument("--W", type=int, default=32)
@@ -52,30 +54,41 @@ def main():
     collate = Collator(tok, lab_id, txt_id)
     model = SpanLabelModel(args.encoder, len(tok), W=args.W).cuda()
     model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
+    sources = args.sources.split(",")
 
-    res = {"ckpt": args.ckpt}
-    enc = {s: encode_split(Path(args.data) / f"{s}.jsonl", tok, args.W)
-           for s in ("dev_calib", "test")}
-    outs = {s: predict(model, e, collate, "cuda") for s, e in enc.items()}
-    T = fit_temperature(outs["dev_calib"])
-    thr_raw = best_threshold(enc["dev_calib"], outs["dev_calib"], 1.0)
-    thr_cal = best_threshold(enc["dev_calib"], outs["dev_calib"], T)
-    res["temperature"] = T
-    for s in enc:
-        res[s] = {
-            "raw@0.5": metrics(enc[s], outs[s], 1.0, 0.5),
-            "raw@tuned": metrics(enc[s], outs[s], 1.0, thr_raw),
-            "calibrated@tuned": metrics(enc[s], outs[s], T, thr_cal),
-        }
-    zt = np.concatenate([o["z"][o["valid"]] for o in outs["test"]])
-    yt = np.concatenate([o["y"][o["valid"]] for o in outs["test"]])
+    # T and thresholds are fit on dev_calib pooled over sources (equal rows per source)
+    enc, outs = {}, {}
+    for split in ("dev_calib", "test"):
+        for src in sources:
+            e = encode_split(Path(args.data) / src / f"{split}.jsonl", tok, args.W, args.limit)
+            enc[(split, src)] = e
+            outs[(split, src)] = predict(model, e, collate, "cuda", batch_size=16)
+    pool_e = [x for src in sources for x in enc[("dev_calib", src)]]
+    pool_o = [x for src in sources for x in outs[("dev_calib", src)]]
+    T = fit_temperature(pool_o)
+    thr_raw = best_threshold(pool_e, pool_o, 1.0)
+    thr_cal = best_threshold(pool_e, pool_o, T)
+    res = {"ckpt": args.ckpt, "temperature": T, "sources": sources, "limit": args.limit}
+
+    def three(e, o):
+        return {"raw@0.5": metrics(e, o, 1.0, 0.5), "raw@tuned": metrics(e, o, 1.0, thr_raw),
+                "calibrated@tuned": metrics(e, o, T, thr_cal)}
+    res["dev_calib"] = three(pool_e, pool_o)       # keys read by ood_eval
+    res["test"] = {src: three(enc[("test", src)], outs[("test", src)]) for src in sources}
+    for key in ("raw@0.5", "raw@tuned", "calibrated@tuned"):
+        res[f"test_macro_f1[{key}]"] = float(np.mean([res["test"][s][key]["f1"] for s in sources]))
+    test_o = [x for src in sources for x in outs[("test", src)]]
+    zt = np.concatenate([o["z"][o["valid"]] for o in test_o])
+    yt = np.concatenate([o["y"][o["valid"]] for o in test_o])
     for name, t in (("raw", 1.0), ("calibrated", T)):
         p = 1 / (1 + np.exp(-zt / t))
         res[f"test_reliability_{name}_all"] = reliability(p, yt)
         thr = thr_raw if name == "raw" else thr_cal
         res[f"test_reliability_{name}_predicted"] = reliability(p[p >= thr], yt[p >= thr])
     Path(args.out).write_text(json.dumps(res, indent=2))
-    print(json.dumps({k: v for k, v in res.items() if "reliability" not in k}, indent=2))
+    print("T", round(T, 3), "thr_raw", thr_raw, "thr_cal", thr_cal)
+    for src in sources:
+        print(src, {k: round(v["f1"], 4) for k, v in res["test"][src].items()})
 
 
 if __name__ == "__main__":

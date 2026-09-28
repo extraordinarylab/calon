@@ -40,6 +40,15 @@ however quick it looks. That includes:
 For result tables, have the job itself write a small summary file (text or
 JSON) and `cat` it.
 
+Also:
+
+- No background polling loops on the login node (`until sacct ...; sleep`,
+  monitors). Submit, stop, and check `sacct` once when asked or when the user
+  says the job is done.
+- Only read compact summaries (tens of lines). Jobs must not dump long
+  previews; never Read multi-MB or very-long-line files.
+- Change files with Edit / Write, not shell `sed`, heredocs or `python`.
+
 ## Partition limits
 
 | | interactive | workq |

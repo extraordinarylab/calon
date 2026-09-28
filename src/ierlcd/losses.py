@@ -16,6 +16,51 @@ import torch
 import torch.nn.functional as F
 
 
+def rlcd_log_probs(u, label_ok):
+    """RLCD choice distribution per span over [none, label_1..label_M].
+
+    u: [B, 1+M, C] utilities (none first); label_ok: [B, M] bool, the labels that
+    are queried with known status. Unqueried / unknown / padded labels get -inf.
+    """
+    ok = torch.cat([label_ok.new_ones(label_ok.shape[0], 1), label_ok], 1)[:, :, None]
+    return torch.log_softmax(u.float().masked_fill(~ok, float("-inf")), 1)
+
+
+def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None):
+    """Plackett-Luce single-choice loss plus multiway Brier score, per span.
+
+    Each candidate span chooses one of [none, queried labels]. Target: its gold
+    label(s) among known queries, else none. With several gold labels the
+    choice loss is -log of their summed probability and the Brier target is
+    uniform over them. In a row that has an unknown query, a span without a
+    gold label is skipped: "none" is not known there. Reduction as in SPEC:
+    mean over a row's valid spans, then over rows.
+    """
+    y = y.float()
+    known = valid.any(-1)                                   # [B,M] queried, known status
+    unknown_row = (query_mask & ~known).any(-1)             # [B]
+    gold = (y > 0) & valid                                  # [B,M,C]
+    has_gold = gold.any(1)                                  # [B,C]
+    span_ok = cand_mask & (has_gold | ~unknown_row[:, None])
+    logp = rlcd_log_probs(u, known)                         # [B,1+M,C]
+    target = torch.cat([~has_gold[:, None, :], gold], 1)
+    ce = -logp.masked_fill(~target, float("-inf")).logsumexp(1)
+    p = logp.exp()
+    t = target.float() / target.float().sum(1, keepdim=True).clamp_min(1)
+    brier = 0.5 * (p - t).square().sum(1)
+    per_span = torch.where(span_ok, ce + brier_weight * brier, torch.zeros_like(ce))
+    cnt = span_ok.sum(-1)
+    active = cnt > 0
+    if not bool(active.any()):
+        return u.float().sum() * 0
+    per_row = per_span.sum(-1) / cnt.clamp_min(1)
+    if stats is not None:
+        sel = span_ok
+        stats["rlcd_ce"] = ((torch.where(sel, ce, torch.zeros_like(ce)).sum(-1) / cnt.clamp_min(1))[active].mean().item())
+        stats["rlcd_brier"] = ((torch.where(sel, brier, torch.zeros_like(brier)).sum(-1) / cnt.clamp_min(1))[active].mean().item())
+    return per_row[active].mean()
+
+
 def spherical_term(u, y):
     """SPEC appendix A: (y p + (1-y)(1-p)) / sqrt(p^2 + (1-p)^2) - 1, p = sigmoid(u)."""
     p = torch.sigmoid(u)

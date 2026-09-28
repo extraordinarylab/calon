@@ -31,8 +31,9 @@ def padding_only_mask(attention_mask, impl, dtype):
 
 class SpanLabelModel(nn.Module):
     def __init__(self, encoder_name, vocab_size, W=32, hidden=512, out=256, width_dim=32,
-                 dropout=0.1, attn_implementation=None):
+                 dropout=0.1, attn_implementation=None, head="bce"):
         super().__init__()
+        self.head_type = head
         kw = {"attn_implementation": attn_implementation} if attn_implementation else {}
         # fp32 master weights (Qwen's config says bf16); compute runs under bf16 autocast
         self.encoder = AutoModel.from_pretrained(encoder_name, dtype=torch.float32, **kw)
@@ -51,6 +52,10 @@ class SpanLabelModel(nn.Module):
         self.label_mlp = mlp(d, hidden, out, dropout)
         self.bias = nn.Parameter(torch.zeros(()))
         self.scale = 1 / math.sqrt(out)
+        if head == "rlcd":
+            # the "not an entity" candidate: a learned key in label space, so its
+            # utility u_none = <span, none> / sqrt(r) depends on the span like any label
+            self.none_key = nn.Parameter(torch.randn(out) * 0.02)
 
     def encode(self, input_ids, attention_mask):
         if not self.bidirectional_decoder:
@@ -81,4 +86,9 @@ class SpanLabelModel(nn.Module):
                           self.width(width.clamp(0, self.width.num_embeddings - 1))], -1)
         s = self.span_mlp(span)                                         # [B,C,O]
         l = self.label_mlp(lab)                                         # [B,M,O]
-        return torch.einsum("bmo,bco->bmc", l, s) * self.scale + self.bias
+        z = torch.einsum("bmo,bco->bmc", l, s) * self.scale + self.bias
+        if self.head_type != "rlcd":
+            return z                                                    # [B,M,C] logits
+        # RLCD: utilities for [none, label_1..label_M] per span -> [B,1+M,C]
+        u_none = torch.einsum("o,bco->bc", self.none_key, s)[:, None, :] * self.scale
+        return torch.cat([u_none, z], 1)

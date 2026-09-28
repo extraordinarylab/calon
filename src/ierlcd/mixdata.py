@@ -75,6 +75,23 @@ class StepDataset(torch.utils.data.Dataset):
         return micro, dict(stats)
 
 
+def fewnerd_coarse_names(data):
+    inv = json.loads((Path(data) / "inventory.json").read_text())
+    return {x["name"] for x in inv["fewnerd"] if not x.get("parent")}
+
+
+def fine_only(rows, coarse):
+    """Few-NERD with its 8 coarse types removed (queries and mentions): each span
+    then has exactly one gold type, as a single-choice RLCD head needs."""
+    out = []
+    for r in rows:
+        r = dict(r)
+        r["queries"] = [q for q in r["queries"] if q["label"] not in coarse]
+        r["entities"] = [e for e in r["entities"] if e["label"] not in coarse]
+        out.append(r)
+    return out
+
+
 def filter_long(rows, tok, what):
     """Drop rows whose text exceeds one 512-token window under this tokenizer
     (windowing is not implemented) and say how many; datasets are pre-filtered
@@ -87,10 +104,12 @@ def filter_long(rows, tok, what):
     return kept
 
 
-def load_eval(data, split, sources, tok, W, limit):
+def load_eval(data, split, sources, tok, W, limit, fewnerd_fine_only=False):
     out = {}
     for src in sources:
         path = Path(data) / src / f"{split}.jsonl"
         rows = filter_long([json.loads(line) for line in open(path)][:limit], tok, f"{src}/{split}")
+        if fewnerd_fine_only and src == "fewnerd":
+            rows = fine_only(rows, fewnerd_coarse_names(data))
         out[src] = [encode_row(r, tok, W) for r in rows]
     return out

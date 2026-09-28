@@ -16,7 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from .collator import Collator, add_control_tokens, encode_row, load_rows
-from .evaluate import decode, f1, metrics, predict
+from .evaluate import decode, f1, metrics, predict, with_temperature
 from .model import SpanLabelModel
 
 
@@ -26,7 +26,7 @@ def per_query(encs, outs, T, threshold):
     counts = collections.defaultdict(lambda: [0, 0, 0])
     absent_q = absent_fp = 0
     for e, o in zip(encs, outs):
-        pred = decode(e, o["z"], thr_logit)
+        pred = decode(e, o["z"], thr_logit, o.get("choice"))
         for m, lab in enumerate(e["labels"]):
             p = {x for x in pred if x[2] == lab}
             g = {x for x in e["gold_spans"] if x[2] == lab}
@@ -53,7 +53,7 @@ def error_breakdown(encs, outs, T, threshold):
     thr_logit = T * float(np.log(threshold / (1 - threshold)))
     fp, fn = collections.Counter(), collections.Counter()
     for e, o in zip(encs, outs):
-        pred = decode(e, o["z"], thr_logit)
+        pred = decode(e, o["z"], thr_logit, o.get("choice"))
         gold = e["gold_spans"]
         gold_spans = {(s, t) for s, t, _ in gold}
         pred_spans = {(s, t) for s, t, _ in pred}
@@ -87,6 +87,7 @@ def main():
     ap.add_argument("--W", type=int, default=32)
     ap.add_argument("--out", required=True)
     ap.add_argument("--name_only", action="store_true")
+    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
     args = ap.parse_args()
     cal = json.loads(Path(args.calibration).read_text())
     T = cal["temperature"]
@@ -98,7 +99,7 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
     collate = Collator(tok, lab_id, txt_id)
-    model = SpanLabelModel(args.encoder, len(tok), W=args.W).cuda()
+    model = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).cuda()
     model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
 
     res = {"ckpt": args.ckpt, "settings": settings, "name_only": args.name_only, "sets": {}}
@@ -113,8 +114,10 @@ def main():
         seen = set(info["seen_labels"])
         r = {}
         for key, (t, thr) in settings.items():
-            m = metrics(encs, outs, t, thr)
-            counts, absent = per_query(encs, outs, t, thr)
+            # RLCD rescales utilities before its softmax; BCE divides logits by t
+            o_t, t = (with_temperature(outs, t), 1.0) if args.head == "rlcd" else (outs, t)
+            m = metrics(encs, o_t, t, thr)
+            counts, absent = per_query(encs, o_t, t, thr)
             per_label = {lab: f1(*c) for lab, c in counts.items()}
             m.update(absent)
             m["macro_label_f1"] = float(np.mean([v["f1"] for v in per_label.values()]))
@@ -122,7 +125,7 @@ def main():
                 tot = np.sum([counts[l] for l in labs], 0) if labs else [0, 0, 0]
                 m[f"{group}_labels_micro"] = f1(*tot)
             m["per_label"] = per_label
-            m["errors"] = error_breakdown(encs, outs, t, thr)
+            m["errors"] = error_breakdown(encs, o_t, t, thr)
             r[key] = m
         res["sets"][name] = r
         print(name, json.dumps({k: {x: round(v[x], 4) for x in

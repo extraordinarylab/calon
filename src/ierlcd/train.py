@@ -24,8 +24,9 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from .collator import Collator, add_control_tokens, encode_row, load_rows
 from .evaluate import metrics, predict
 from .losses import loss_fn
-from .mixdata import (StepDataset, filter_long, load_eval, load_interned, parse_mix,
-                      step_schedule)
+from .losses import rlcd_loss
+from .mixdata import (StepDataset, fewnerd_coarse_names, filter_long, fine_only, load_eval,
+                      load_interned, parse_mix, step_schedule)
 from .model import SpanLabelModel
 
 
@@ -39,8 +40,10 @@ def param_groups(model, enc_lr, head_lr, wd):
             for (e, d), ps in groups.items() if ps]
 
 
-def encode_split(path, tok, W, limit=None):
+def encode_split(path, tok, W, limit=None, transform=None):
     rows = filter_long(load_rows(path)[:limit], tok, str(path))
+    if transform is not None:
+        rows = transform(rows)
     return [encode_row(r, tok, W) for r in rows]
 
 
@@ -69,6 +72,10 @@ def main():
     ap.add_argument("--lam", type=float, default=0.1)
     ap.add_argument("--lam_ramp", type=int, default=200)
     ap.add_argument("--alpha", type=float, default=0.0, help="spherical-score weight (appendix A)")
+    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"],
+                    help="rlcd: per-span choice over [none, labels], Plackett-Luce + Brier")
+    ap.add_argument("--brier_weight", type=float, default=1.0)
+    ap.add_argument("--fewnerd_fine_only", action="store_true")
     ap.add_argument("--enc_lr", type=float, default=2e-5)
     ap.add_argument("--head_lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.01)
@@ -103,7 +110,10 @@ def main():
     t0 = time.time()
     rows = {src: filter_long(load_interned(Path(args.data) / src / "train.jsonl"), tok,
                              f"{src}/train") for src in mix}
-    dev = load_eval(args.data, "dev_select", list(mix), tok, args.W, args.eval_limit) if main_rank else {}
+    if args.fewnerd_fine_only and "fewnerd" in rows:
+        rows["fewnerd"] = fine_only(rows["fewnerd"], fewnerd_coarse_names(args.data))
+    dev = load_eval(args.data, "dev_select", list(mix), tok, args.W, args.eval_limit,
+                    args.fewnerd_fine_only) if main_rank else {}
     if main_rank:
         print(f"world={world} loaded train={ {s: len(r) for s, r in rows.items()} } "
               f"dev={ {s: len(d) for s, d in dev.items()} } in {time.time() - t0:.1f}s", flush=True)
@@ -113,7 +123,7 @@ def main():
         StepDataset(rows, steps, tok, collate, args.W, args.micro, rank, world), batch_size=None,
         shuffle=False, num_workers=args.workers, prefetch_factor=4, persistent_workers=False)
 
-    base = SpanLabelModel(args.encoder, len(tok), W=args.W).to(device)
+    base = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).to(device)
     if args.init:
         base.load_state_dict(torch.load(args.init, map_location=device))
     model = DDP(base, device_ids=[local]) if world > 1 else base
@@ -146,15 +156,20 @@ def main():
                     (z.float().sum() * 0).backward()
                     continue
                 stats = {}
-                loss = loss_fn(z, tgt["y"].to(device), tgt["valid"].to(device), mode=args.mode,
-                               K=args.K, sigma=args.sigma, lam=lam, generator=noise_gen,
-                               stats=stats, alpha=args.alpha)
+                if args.head == "rlcd":
+                    loss = rlcd_loss(z, tgt["y"].to(device), tgt["valid"].to(device),
+                                     tgt["query_mask"].to(device), tgt["cand_mask"].to(device),
+                                     brier_weight=args.brier_weight, stats=stats)
+                else:
+                    loss = loss_fn(z, tgt["y"].to(device), tgt["valid"].to(device), mode=args.mode,
+                                   K=args.K, sigma=args.sigma, lam=lam, generator=noise_gen,
+                                   stats=stats, alpha=args.alpha)
                 # DDP averages gradients over ranks, hence the factor `world`
                 (loss * n_act * world / n_total).backward()
             for k, v in stats.items():
                 stats_acc[k] = stats_acc.get(k, 0.0) + v * n_act / n_total
         if world > 1:                           # logged stats: sum of every rank's share
-            keys = ("clean_bce", "mean_reward", "auxiliary")
+            keys = ("clean_bce", "mean_reward", "auxiliary", "rlcd_ce", "rlcd_brier")
             t = torch.tensor([stats_acc.get(k, 0.0) for k in keys], device=device)
             dist.all_reduce(t)
             stats_acc = {k: v for k, v in zip(keys, t.tolist()) if k in stats_acc}

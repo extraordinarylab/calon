@@ -13,7 +13,8 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 
 from .collator import Collator, add_control_tokens
-from .evaluate import f1, f1_counts, metrics, predict, reliability
+from .evaluate import f1, f1_counts, metrics, predict, reliability, rlcd_brier, with_temperature
+from .mixdata import fewnerd_coarse_names, fine_only
 from .model import SpanLabelModel
 from .train import encode_split
 
@@ -48,43 +49,63 @@ def main():
     ap.add_argument("--encoder", default="answerdotai/ModernBERT-base")
     ap.add_argument("--W", type=int, default=32)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
+    ap.add_argument("--fewnerd_fine_only", action="store_true")
     args = ap.parse_args()
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
     collate = Collator(tok, lab_id, txt_id)
-    model = SpanLabelModel(args.encoder, len(tok), W=args.W).cuda()
+    model = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).cuda()
     model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
     sources = args.sources.split(",")
+    rlcd = args.head == "rlcd"
+    coarse = fewnerd_coarse_names(args.data) if args.fewnerd_fine_only else None
 
     # T and thresholds are fit on dev_calib pooled over sources (equal rows per source)
     enc, outs = {}, {}
     for split in ("dev_calib", "test"):
         for src in sources:
-            e = encode_split(Path(args.data) / src / f"{split}.jsonl", tok, args.W, args.limit)
+            tf = (lambda rows: fine_only(rows, coarse)) if coarse and src == "fewnerd" else None
+            e = encode_split(Path(args.data) / src / f"{split}.jsonl", tok, args.W, args.limit, tf)
             enc[(split, src)] = e
             outs[(split, src)] = predict(model, e, collate, "cuda", batch_size=16)
     pool_e = [x for src in sources for x in enc[("dev_calib", src)]]
     pool_o = [x for src in sources for x in outs[("dev_calib", src)]]
-    T = fit_temperature(pool_o)
-    thr_raw = best_threshold(pool_e, pool_o, 1.0)
-    thr_cal = best_threshold(pool_e, pool_o, T)
-    res = {"ckpt": args.ckpt, "temperature": T, "sources": sources, "limit": args.limit}
+
+    def view(o, T):
+        """(rows, divisor) for metrics: RLCD rescales utilities before the softmax."""
+        return (with_temperature(o, T), 1.0) if rlcd else (o, T)
+
+    if rlcd:   # RLCD: temperature minimizing multiway Brier on dev_calib (the blog's recipe)
+        grid = np.exp(np.linspace(np.log(0.25), np.log(4.0), 57))
+        T = float(min(grid, key=lambda t: rlcd_brier(pool_o, t)))
+    else:
+        T = fit_temperature(pool_o)
+    thr_raw = best_threshold(pool_e, *view(pool_o, 1.0))
+    thr_cal = best_threshold(pool_e, *view(pool_o, T))
+    res = {"ckpt": args.ckpt, "temperature": T, "sources": sources, "limit": args.limit,
+           "head": args.head, "fewnerd_fine_only": args.fewnerd_fine_only}
 
     def three(e, o):
-        return {"raw@0.5": metrics(e, o, 1.0, 0.5), "raw@tuned": metrics(e, o, 1.0, thr_raw),
-                "calibrated@tuned": metrics(e, o, T, thr_cal)}
+        return {"raw@0.5": metrics(e, *view(o, 1.0), 0.5),
+                "raw@tuned": metrics(e, *view(o, 1.0), thr_raw),
+                "calibrated@tuned": metrics(e, *view(o, T), thr_cal)}
     res["dev_calib"] = three(pool_e, pool_o)       # keys read by ood_eval
     res["test"] = {src: three(enc[("test", src)], outs[("test", src)]) for src in sources}
     for key in ("raw@0.5", "raw@tuned", "calibrated@tuned"):
         res[f"test_macro_f1[{key}]"] = float(np.mean([res["test"][s][key]["f1"] for s in sources]))
     test_o = [x for src in sources for x in outs[("test", src)]]
-    zt = np.concatenate([o["z"][o["valid"]] for o in test_o])
-    yt = np.concatenate([o["y"][o["valid"]] for o in test_o])
     for name, t in (("raw", 1.0), ("calibrated", T)):
-        p = 1 / (1 + np.exp(-zt / t))
+        rows, div = view(test_o, t)
+        zt = np.concatenate([o["z"][o["valid"]] for o in rows]) / div
+        yt = np.concatenate([o["y"][o["valid"]] for o in rows])
+        p = 1 / (1 + np.exp(-zt))
         res[f"test_reliability_{name}_all"] = reliability(p, yt)
         thr = thr_raw if name == "raw" else thr_cal
-        res[f"test_reliability_{name}_predicted"] = reliability(p[p >= thr], yt[p >= thr])
+        sel = p >= thr
+        if rlcd:
+            sel &= np.concatenate([o["choice"][o["valid"]] for o in rows])
+        res[f"test_reliability_{name}_predicted"] = reliability(p[sel], yt[sel])
     Path(args.out).write_text(json.dumps(res, indent=2))
     print("T", round(T, 3), "thr_raw", thr_raw, "thr_cal", thr_cal)
     for src in sources:

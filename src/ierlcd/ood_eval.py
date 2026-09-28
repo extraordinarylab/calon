@@ -2,6 +2,9 @@
 
 T and the threshold come from that checkpoint's FiNERWeb calibration.json
 (fit on FiNERWeb dev_calib); no OOD data is used to choose them.
+
+--name_only drops label descriptions (diagnostic). Every setting also gets an
+error breakdown of false positives and false negatives.
 """
 import argparse
 import collections
@@ -12,10 +15,9 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer
 
-from .collator import Collator, add_control_tokens
+from .collator import Collator, add_control_tokens, encode_row, load_rows
 from .evaluate import decode, f1, metrics, predict
 from .model import SpanLabelModel
-from .train import encode_split
 
 
 def per_query(encs, outs, T, threshold):
@@ -39,6 +41,43 @@ def per_query(encs, outs, T, threshold):
                     "absent_query_fpr": absent_fp / absent_q if absent_q else float("nan")}
 
 
+def overlaps(a, b):
+    return a[0] < b[1] and b[0] < a[1]
+
+
+def error_breakdown(encs, outs, T, threshold):
+    """FP: wrong_type (exact gold span, other label; `extra_label` if the gold
+    label was also predicted there), boundary (overlaps same-label gold),
+    boundary_and_type (overlaps other-label gold), spurious (no gold overlap).
+    FN: found_as_other_type, boundary (overlapping same-label prediction), missed."""
+    thr_logit = T * float(np.log(threshold / (1 - threshold)))
+    fp, fn = collections.Counter(), collections.Counter()
+    for e, o in zip(encs, outs):
+        pred = decode(e, o["z"], thr_logit)
+        gold = e["gold_spans"]
+        gold_spans = {(s, t) for s, t, _ in gold}
+        pred_spans = {(s, t) for s, t, _ in pred}
+        for s, t, lab in pred - gold:
+            if (s, t) in gold_spans:
+                fp["wrong_type"] += 1
+                if any((s, t, g) in pred for (gs, gt, g) in gold if (gs, gt) == (s, t)):
+                    fp["wrong_type_extra_label"] += 1
+            elif any(overlaps((s, t), (gs, gt)) for gs, gt, g in gold if g == lab):
+                fp["boundary"] += 1
+            elif any(overlaps((s, t), (gs, gt)) for gs, gt, _ in gold):
+                fp["boundary_and_type"] += 1
+            else:
+                fp["spurious"] += 1
+        for s, t, lab in gold - pred:
+            if (s, t) in pred_spans:
+                fn["found_as_other_type"] += 1
+            elif any(overlaps((s, t), (ps, pt)) for ps, pt, p in pred if p == lab):
+                fn["boundary"] += 1
+            else:
+                fn["missed"] += 1
+    return {"fp": dict(fp), "fn": dict(fn)}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ood", required=True, help="dir written by prepare_ood")
@@ -47,6 +86,7 @@ def main():
     ap.add_argument("--encoder", default="answerdotai/ModernBERT-base")
     ap.add_argument("--W", type=int, default=32)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--name_only", action="store_true")
     args = ap.parse_args()
     cal = json.loads(Path(args.calibration).read_text())
     T = cal["temperature"]
@@ -61,9 +101,14 @@ def main():
     model = SpanLabelModel(args.encoder, len(tok), W=args.W).cuda()
     model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
 
-    res = {"ckpt": args.ckpt, "settings": settings, "sets": {}}
+    res = {"ckpt": args.ckpt, "settings": settings, "name_only": args.name_only, "sets": {}}
     for name, info in manifest["sets"].items():
-        encs = encode_split(Path(args.ood) / f"{name}.jsonl", tok, args.W)
+        rows = load_rows(Path(args.ood) / f"{name}.jsonl")
+        if args.name_only:
+            for r in rows:
+                for q in r["queries"]:
+                    q["description"], q["description_origin"] = "", "name_only"
+        encs = [encode_row(r, tok, args.W) for r in rows]
         outs = predict(model, encs, collate, "cuda")
         seen = set(info["seen_labels"])
         r = {}
@@ -77,6 +122,7 @@ def main():
                 tot = np.sum([counts[l] for l in labs], 0) if labs else [0, 0, 0]
                 m[f"{group}_labels_micro"] = f1(*tot)
             m["per_label"] = per_label
+            m["errors"] = error_breakdown(encs, outs, t, thr)
             r[key] = m
         res["sets"][name] = r
         print(name, json.dumps({k: {x: round(v[x], 4) for x in

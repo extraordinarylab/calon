@@ -24,7 +24,8 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from .collator import Collator, add_control_tokens, encode_row, load_rows
 from .evaluate import metrics, predict
 from .losses import loss_fn
-from .mixdata import StepDataset, load_eval, load_interned, parse_mix, step_schedule
+from .mixdata import (StepDataset, filter_long, load_eval, load_interned, parse_mix,
+                      step_schedule)
 from .model import SpanLabelModel
 
 
@@ -39,7 +40,7 @@ def param_groups(model, enc_lr, head_lr, wd):
 
 
 def encode_split(path, tok, W, limit=None):
-    rows = load_rows(path)[:limit]
+    rows = filter_long(load_rows(path)[:limit], tok, str(path))
     return [encode_row(r, tok, W) for r in rows]
 
 
@@ -100,7 +101,8 @@ def main():
     collate = Collator(tok, lab_id, txt_id)
     mix = parse_mix(args.mix)
     t0 = time.time()
-    rows = {src: load_interned(Path(args.data) / src / "train.jsonl") for src in mix}
+    rows = {src: filter_long(load_interned(Path(args.data) / src / "train.jsonl"), tok,
+                             f"{src}/train") for src in mix}
     dev = load_eval(args.data, "dev_select", list(mix), tok, args.W, args.eval_limit) if main_rank else {}
     if main_rank:
         print(f"world={world} loaded train={ {s: len(r) for s, r in rows.items()} } "

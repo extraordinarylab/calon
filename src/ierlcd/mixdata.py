@@ -12,6 +12,7 @@ from pathlib import Path
 
 import torch
 
+from .alignment import MAX_TEXT_TOKENS
 from .collator import encode_row
 from .prepare_mix import sample_queries
 
@@ -74,10 +75,22 @@ class StepDataset(torch.utils.data.Dataset):
         return micro, dict(stats)
 
 
+def filter_long(rows, tok, what):
+    """Drop rows whose text exceeds one 512-token window under this tokenizer
+    (windowing is not implemented) and say how many; datasets are pre-filtered
+    with ModernBERT's tokenizer, so this only acts for other encoders."""
+    lengths = tok([r["text"] for r in rows], add_special_tokens=False)["input_ids"]
+    kept = [r for r, ids in zip(rows, lengths) if len(ids) <= MAX_TEXT_TOKENS]
+    if len(kept) < len(rows):
+        print(f"filter_long {what}: dropped {len(rows) - len(kept)} of {len(rows)} rows "
+              f"over {MAX_TEXT_TOKENS} tokens", flush=True)
+    return kept
+
+
 def load_eval(data, split, sources, tok, W, limit):
     out = {}
     for src in sources:
         path = Path(data) / src / f"{split}.jsonl"
-        rows = [json.loads(line) for line in open(path)][:limit]
+        rows = filter_long([json.loads(line) for line in open(path)][:limit], tok, f"{src}/{split}")
         out[src] = [encode_row(r, tok, W) for r in rows]
     return out

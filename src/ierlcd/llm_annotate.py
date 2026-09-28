@@ -440,6 +440,8 @@ def assemble(args):
     for f in (ROOT / "data/ood").glob("*.jsonl"):
         ood_test += [r["text"] for r in read_jsonl(f)]
     from .prepare_mix import fixed_eval_queries
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
     summary = {}
     for src, rows in rows_by_src.items():
         # keep every row's full schema well under the 1,500-token schema budget
@@ -447,6 +449,11 @@ def assemble(args):
         rows = [r for r in rows if sum(len(q["label"]) + len(q["description"]) + 3
                                        for q in r["queries"]) <= 4000]
         stats[f"{src}_drop_long_schema"] = before - len(rows)
+        # text windowing is not implemented: keep texts within one 512-token window
+        lengths = tok([r["text"] for r in rows], add_special_tokens=False)["input_ids"]
+        before = len(rows)
+        rows = [r for r, ids in zip(rows, lengths) if len(ids) <= 512]
+        stats[f"{src}_drop_over_512_tokens"] = before - len(rows)
         rows = contamination_filter(rows, ood_test, stats, src)
         by_hash = collections.defaultdict(list)
         for i, r in enumerate(rows):

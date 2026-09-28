@@ -1,0 +1,214 @@
+<title>IE-RLCD 第三輪結果</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --ink: #1b2230; --muted: #5a6475; --line: #dde1e8; --grid: #e6e9ef;
+  /* Okabe-Ito, colour-blind safe */
+  --rlcd: #009e73; --bce: #0072b2; --gl2: #cc79a7; --glf: #d55e00; --old: #9aa3b3;
+  --serif: "Noto Serif TC", "Songti TC", serif;
+  --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441; --grid: #252d39;
+    --rlcd: #3cc59a; --bce: #56a8e0; --gl2: #e39ac4; --glf: #f0813a; --old: #6b7485;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441; --grid: #252d39;
+  --rlcd: #3cc59a; --bce: #56a8e0; --gl2: #e39ac4; --glf: #f0813a; --old: #6b7485;
+}
+body { background: var(--bg); color: var(--ink); font: 16px/1.75 var(--sans); padding-block: 40px 64px; padding-inline: 18px; }
+.wrap { max-width: 900px; margin: 0 auto; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 34px/1.25 var(--serif); margin: 0; text-wrap: balance; }
+h2 { font: 700 23px/1.35 var(--serif); margin: 0 0 6px; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+.lede { font-size: 18px; }
+.muted { color: var(--muted); }
+section { display: grid; gap: 14px; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 72ch; }
+figcaption b { color: var(--ink); }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px 8px; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.chart text { fill: var(--muted); font: 12px var(--sans); }
+.chart .val { fill: var(--ink); font: 500 12px var(--mono); }
+.chart .lab { fill: var(--ink); font: 13px var(--sans); }
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 620px; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 500; color: var(--muted); font-size: 13px; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--sans); }
+tbody tr:last-child td { border-bottom: 0; }
+.best { font-weight: 500; color: var(--rlcd); }
+ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 72ch; }
+.note { font-size: 14px; color: var(--muted); }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 520px) { h1 { font-size: 27px; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">英文命名實體抽取 · 2026-09-28 · 第三輪 · 5 個種子</div>
+  <h1>RLCD 贏過 BCE，但漏抓太多</h1>
+  <p class="lede">修正判斷規則並加入新的合成資料後，RLCD 在沒看過的七個領域上達到 0.572，比 BCE 的 0.549 高、亂抓也少很多；但還沒超過 GLiNER2-large（0.597）和 gliformer-large（0.653）。差距主要來自漏抓：我們有 51% 的實體沒抓到，基準大約 38%。</p>
+</header>
+
+<section>
+  <h2>和基準比較</h2>
+  <figure>
+    <div class="chart"><svg id="f1" viewBox="0 0 760 230" role="img" aria-label="各模型沒看過領域平均 F1"></svg></div>
+    <figcaption><b>RLCD 比 BCE 高 0.023，但仍比 GLiNER2-large 低 0.025。</b>沒看過的七個領域（CrossNER 五個領域與 MIT 電影、餐廳）的平均 F1；我們的模型是 5 個種子的平均，細線為 ±1 標準差；基準模型為單次評估。gliformer 不接受類別說明，這裡是只給名稱的結果，其他三者測試時有給說明。</figcaption>
+  </figure>
+  <figure>
+    <div class="chart"><svg id="trade" viewBox="0 0 760 340" role="img" aria-label="亂抓率與漏抓率"></svg></div>
+    <figcaption><b>RLCD 亂抓最少，但漏抓最多；越靠左下越好。</b>橫軸是亂抓率（句子裡沒有某類別時仍輸出該類別的比例），縱軸是漏抓率（該抓的實體沒抓到的比例），皆為七個領域的平均。</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>模型</th><th>平均</th><th>CrossNER</th><th>MIT 電影</th><th>MIT 餐廳</th><th>亂抓率</th><th>漏抓率</th><th>只給名稱</th><th>PII</th></tr></thead>
+    <tbody>
+      <tr><td>RLCD（新判斷規則）</td><td>0.572 ± 0.008</td><td>0.597</td><td class="best">0.517</td><td>0.500</td><td class="best">6.0%</td><td>51.4%</td><td>0.537</td><td>0.512</td></tr>
+      <tr><td>BCE，6,000 步</td><td>0.549 ± 0.014</td><td>0.589</td><td>0.434</td><td>0.462</td><td>14.3%</td><td>38.8%</td><td>0.525</td><td>0.420</td></tr>
+      <tr><td>GLiNER2-large</td><td class="best">0.597</td><td class="best">0.624</td><td>0.506</td><td class="best">0.553</td><td>11.2%</td><td class="best">37.6%</td><td>0.548</td><td>0.550</td></tr>
+      <tr><td>gliformer-large（只給名稱）</td><td>—</td><td>—</td><td>—</td><td>—</td><td>6.5%</td><td>37.9%</td><td class="best">0.653</td><td class="best">0.561</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">PII 欄：ai4privacy 3,000 筆英文，只拿來測試；我們與 GLiNER2 用有說明的結果（GLiNER2 只給名稱時是 0.569），gliformer 用只給名稱的結果。gliformer 其他欄因為不接受說明，只列在「只給名稱」。</p>
+</section>
+
+<section>
+  <h2>RLCD 為什麼漏抓：機率被相近類別分掉</h2>
+  <p>CrossNER 同時問「person」和較特定的類別（例如 writer），並規定特定類別優先。RLCD 每個片段只能選一個類別、機率加起來等於 1，當兩個類別都說得通時機率被分掉，原本的規則要求被選類別的機率超過門檻（0.76），結果什麼都不輸出。新規則改成先看「是不是實體」，再選類別。</p>
+  <figure>
+    <div class="chart"><svg id="labels" viewBox="0 0 760 250" role="img" aria-label="特定人物類別的 F1"></svg></div>
+    <figcaption><b>新判斷規則把這些類別大部分救回來，但除了 band 仍低於 BCE。</b>第二輪 Qwen3 zero-shot 模型（拿掉 30% 說明，3 個種子）的逐類別 F1；灰色為 RLCD 原規則，綠色為新規則，藍色為 BCE。</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>這一輪做了什麼</h2>
+  <ul>
+    <li><b>新的合成資料</b>：Qwen3.8 寫了 40,000 篇音樂、文學、口語查詢文字，類別與說明由它自己定，不看任何 CrossNER/MIT 例句；組成 31,868 筆訓練資料。</li>
+    <li><b>設定只用訓練來源的驗證資料挑選</b>：12 組 RLCD 設定 × 2 種判斷規則，最好的是 Brier 0、Few-NERD 只用細類、6,000 步、新判斷規則（驗證資料 0.676；前三名只差 0.003，單一種子）。BCE 同樣在 3,000 與 6,000 步之間選，選出 6,000 步。</li>
+    <li><b>資料檢查</b>：改用忽略標點與空白的比對，所有訓練資料和測試集之間只找到 8 句重疊，已移除後才訓練最終的 15 個模型。</li>
+    <li><b>同時準備的資料</b>：REBEL 3,453,387 句由 Qwen3.8 標註實體與關係（255/256 份完成，1 份重跑中）；CrossRE 已轉成 mneb 格式，它的測試句子就是 CrossNER 的測試句子，之後訓練時必須避開。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>限制</h2>
+  <ul class="note">
+    <li>設定調整只用一個種子，前三名差距很小。</li>
+    <li>新合成資料的主題（音樂、文學、口語查詢）是看了上一輪的弱點才選的，也要求「一般類別與特定子類別同時出現、只標最具體的」，這和 CrossNER 的慣例相同。</li>
+    <li>GLiNER2 的訓練資料含 Wikipedia，gliformer 沒有公開訓練資料；它們在 CrossNER 上的分數可能偏樂觀。</li>
+    <li>我們模型在 PII 上只給名稱的結果、BCE 3,000 步在 PII 上五個種子差很多（0.157 ± 0.100）的原因，都還沒整理。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>下一步建議</h2>
+  <ul>
+    <li>檢查門檻是否在沒看過的領域一致偏高（漏抓是主要問題）。</li>
+    <li>試更大的雙向模型。</li>
+    <li>繼續擴充不看目標例句的合成資料，特別是 MIT 餐廳這類口語查詢。</li>
+  </ul>
+</section>
+
+<footer>模型：雙向 Qwen3-0.6B；生成與標註：Qwen3.8-27B。基準：fastino/gliner2-large-v1、knowledgator/gliformer-large-v1，用它們的預設門檻、同樣的測試資料與嚴格計分。完整報告在 ie-rlcd repo 的 reports/2026-09-28-round3-experiments.md。</footer>
+</div>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) {
+      var v = attrs[k];
+      if (typeof v === "string" && v.indexOf("var(") === 0) e.style.setProperty(k, v);
+      else e.setAttribute(k, v);
+    }
+    if (text != null) e.textContent = text;
+    parent.appendChild(e); return e;
+  }
+  // 1. average F1, 0-0.7
+  (function () {
+    var rows = [["gliformer-large（只給名稱）", 0.653, 0, "var(--glf)"], ["GLiNER2-large", 0.597, 0, "var(--gl2)"],
+                ["RLCD（新判斷規則）", 0.572, 0.008, "var(--rlcd)"], ["BCE，6,000 步", 0.549, 0.014, "var(--bce)"]];
+    var svg = document.getElementById("f1"), L = 210, R = 700, top = 10, rowH = 44, max = 0.7;
+    function x(v) { return L + (R - L) * v / max; }
+    var H = top + rowH * rows.length;
+    [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].forEach(function (t) {
+      el("line", { x1: x(t), x2: x(t), y1: top, y2: H, stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: x(t), y: H + 16, "text-anchor": "middle" }, svg, t.toFixed(1));
+    });
+    rows.forEach(function (b, i) {
+      var y = top + i * rowH + 9, h = 24;
+      el("text", { x: L - 10, y: y + 17, "text-anchor": "end", class: "lab" }, svg, b[0]);
+      el("rect", { x: L, y: y, width: x(b[1]) - L, height: h, rx: 3, fill: b[3] }, svg);
+      if (b[2]) el("line", { x1: x(b[1] - b[2]), x2: x(b[1] + b[2]), y1: y + h / 2, y2: y + h / 2, stroke: "var(--ink)", "stroke-width": 1.5 }, svg);
+      el("text", { x: x(b[1] + b[2]) + 8, y: y + 17, class: "val" }, svg, b[1].toFixed(3));
+    });
+    el("text", { x: (L + R) / 2, y: H + 34, "text-anchor": "middle" }, svg, "沒看過的七個領域平均 F1");
+  })();
+  // 2. false-positive rate vs miss rate, distinct shapes
+  (function () {
+    var pts = [["RLCD", 0.060, 0.514, "var(--rlcd)", "circle"], ["BCE", 0.143, 0.388, "var(--bce)", "square"],
+               ["GLiNER2-large", 0.112, 0.376, "var(--gl2)", "diamond"], ["gliformer-large", 0.065, 0.379, "var(--glf)", "triangle"]];
+    var svg = document.getElementById("trade"), L = 80, R = 720, T = 16, B = 290;
+    function x(v) { return L + (R - L) * v / 0.2; }
+    function y(v) { return B - (B - T) * (v - 0.3) / 0.3; }
+    [0, 0.05, 0.10, 0.15, 0.20].forEach(function (t) {
+      el("line", { x1: x(t), x2: x(t), y1: T, y2: B, stroke: "var(--grid)" }, svg);
+      el("text", { x: x(t), y: B + 18, "text-anchor": "middle" }, svg, Math.round(t * 100) + "%");
+    });
+    [0.3, 0.4, 0.5, 0.6].forEach(function (t) {
+      el("line", { x1: L, x2: R, y1: y(t), y2: y(t), stroke: "var(--grid)" }, svg);
+      el("text", { x: L - 10, y: y(t) + 4, "text-anchor": "end" }, svg, Math.round(t * 100) + "%");
+    });
+    el("text", { x: (L + R) / 2, y: B + 40, "text-anchor": "middle" }, svg, "亂抓率（越低越好）");
+    el("text", { x: 20, y: (T + B) / 2, "text-anchor": "middle", transform: "rotate(-90 20 " + (T + B) / 2 + ")" }, svg, "漏抓率（越低越好）");
+    pts.forEach(function (p) {
+      var cx = x(p[1]), cy = y(p[2]), s = 8;
+      if (p[4] === "circle") el("circle", { cx: cx, cy: cy, r: s, fill: p[3] }, svg);
+      if (p[4] === "square") el("rect", { x: cx - s, y: cy - s, width: 2 * s, height: 2 * s, fill: p[3] }, svg);
+      if (p[4] === "diamond") el("polygon", { points: [cx, cy - s - 2, cx + s + 2, cy, cx, cy + s + 2, cx - s - 2, cy].join(","), fill: p[3] }, svg);
+      if (p[4] === "triangle") el("polygon", { points: [cx, cy - s - 2, cx + s + 2, cy + s, cx - s - 2, cy + s].join(","), fill: p[3] }, svg);
+      var dy = p[0] === "gliformer-large" ? -16 : (p[0] === "GLiNER2-large" ? 22 : -14);
+      el("text", { x: cx + 14, y: cy + dy, class: "lab" }, svg, p[0] + "（" + Math.round(p[1] * 1000) / 10 + "%，" + Math.round(p[2] * 1000) / 10 + "%）");
+    });
+  })();
+  // 3. specific-person labels: old RLCD, new RLCD, BCE
+  (function () {
+    var rows = [["musical artist", 0.194, 0.649, 0.782], ["band", 0.145, 0.604, 0.564], ["writer", 0.168, 0.616, 0.800],
+                ["scientist", 0.019, 0.605, 0.845], ["researcher", 0.020, 0.309, 0.816]];
+    var svg = document.getElementById("labels"), L = 140, R = 720, top = 14, rowH = 40;
+    function x(v) { return L + (R - L) * v; }
+    var H = top + rowH * rows.length;
+    [0, 0.2, 0.4, 0.6, 0.8, 1.0].forEach(function (t) {
+      el("line", { x1: x(t), x2: x(t), y1: top, y2: H, stroke: "var(--grid)" }, svg);
+      el("text", { x: x(t), y: H + 16, "text-anchor": "middle" }, svg, t.toFixed(1));
+    });
+    rows.forEach(function (r, i) {
+      var y = top + i * rowH + 20;
+      el("text", { x: L - 12, y: y + 4, "text-anchor": "end", class: "lab" }, svg, r[0]);
+      el("line", { x1: x(r[1]), x2: x(r[2]), y1: y, y2: y, stroke: "var(--rlcd)", "stroke-width": 2 }, svg);
+      el("circle", { cx: x(r[1]), cy: y, r: 6, fill: "var(--old)" }, svg);
+      el("circle", { cx: x(r[2]), cy: y, r: 7, fill: "var(--rlcd)" }, svg);
+      el("rect", { x: x(r[3]) - 6, y: y - 6, width: 12, height: 12, fill: "var(--bce)" }, svg);
+    });
+    var ly = H + 34;
+    el("circle", { cx: L, cy: ly - 4, r: 6, fill: "var(--old)" }, svg); el("text", { x: L + 12, y: ly, class: "lab" }, svg, "RLCD 原規則");
+    el("circle", { cx: L + 150, cy: ly - 4, r: 7, fill: "var(--rlcd)" }, svg); el("text", { x: L + 162, y: ly, class: "lab" }, svg, "RLCD 新規則");
+    el("rect", { x: L + 294, y: ly - 10, width: 12, height: 12, fill: "var(--bce)" }, svg); el("text", { x: L + 312, y: ly, class: "lab" }, svg, "BCE");
+  })();
+})();
+</script>

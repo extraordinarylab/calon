@@ -148,7 +148,9 @@ def main():
                 print(f"{exp + '/' + a:28s}" + "".join(
                     f"{m[c]['mean']:.4f}±{m[c]['std']:.4f}".rjust(16) if c in m else " " * 16
                     for c in cols))
-        for arm in ("warmup", "bce-s0.2"):
+        for arm in ("warmup", "bce-s0.2", "bce-12k", "rlcd-12k"):
+            if not any(arm in arms for arms in allres.values()):
+                continue
             print(f"== per OOD set F1, arm {arm} (mean over seeds)")
             print("exp".ljust(14) + "".join(s.replace("crossner_", "cn_")[:10].rjust(11) for s in OOD))
             for exp, arms in allres.items():

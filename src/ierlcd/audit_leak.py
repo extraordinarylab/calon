@@ -33,6 +33,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mix", nargs="+", default=[str(ROOT / "data/mix"), str(ROOT / "data/mix2")])
     ap.add_argument("--out", default=str(ROOT / "runs2/leak_audit.json"))
+    ap.add_argument("--remove", action="store_true",
+                    help="rewrite each train.jsonl without the flagged rows (original kept as .pre_audit)")
     args = ap.parse_args()
     ood = {}
     for d in (ROOT / "data/ood", ROOT / "data/ood_pii"):
@@ -52,26 +54,33 @@ def main():
             f = src_dir / "train.jsonl"
             if not f.exists():
                 continue
-            c, ex = collections.Counter(), []
+            c, ex, keep = collections.Counter(), [], []
             for line in open(f):
                 t = json.loads(line)["text"]
                 k = key(t)
+                flagged = False
                 if k in exact:
                     c[f"exact/{exact[k]}"] += 1
+                    flagged = True
                     if len(ex) < 3:
                         ex.append(("exact", exact[k], t[:160]))
-                    continue
-                g = grams(t)
-                if not g:
-                    continue
-                shared = collections.Counter(j for x in g for j in idx.get(x, ()))
-                for j, s in shared.items():
-                    name, gj, tj = og[j]
-                    if gj and (s / len(gj) >= 0.8 or s / len(g) >= 0.8):
-                        c[f"near/{name}"] += 1
-                        if len(ex) < 3:
-                            ex.append(("near", name, t[:120], tj[:120]))
-                        break
+                else:
+                    g = grams(t)
+                    shared = collections.Counter(j for x in g for j in idx.get(x, ())) if g else {}
+                    for j, s in shared.items():
+                        name, gj, tj = og[j]
+                        if gj and (s / len(gj) >= 0.8 or s / len(g) >= 0.8):
+                            c[f"near/{name}"] += 1
+                            flagged = True
+                            if len(ex) < 3:
+                                ex.append(("near", name, t[:120], tj[:120]))
+                            break
+                if not flagged:
+                    keep.append(line)
+            if args.remove and sum(c.values()):
+                f.rename(f.with_suffix(".jsonl.pre_audit"))
+                f.write_text("".join(keep))
+                c["removed"] = sum(v for k2, v in c.items() if k2 != "removed")
             report[f"{Path(mix).name}/{src_dir.name}"] = {"counts": dict(c), "examples": ex}
             print(f"{Path(mix).name}/{src_dir.name}: {dict(c)}", flush=True)
     Path(args.out).write_text(json.dumps(report, indent=1, ensure_ascii=False))

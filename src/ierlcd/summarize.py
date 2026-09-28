@@ -1,5 +1,6 @@
 """Compact result tables for a run directory, next to a baseline run directory."""
 import argparse
+import collections
 import json
 from pathlib import Path
 
@@ -91,12 +92,57 @@ def seeds_table(seed_dirs, baseline):
                 print(f"{a:16s} 1 " + " ".join(f"{m[c]:15.4f}" for c in cols))
 
 
+def collect_all(root, exps, seeds):
+    """{exp: {arm: {metric: [per-seed values]}}} including per-OOD-set F1 and FPR."""
+    import statistics
+    out = {}
+    for exp in exps:
+        dirs = [Path(root) / f"{exp}-s{s}" for s in seeds]
+        dirs = [d for d in dirs if d.exists()]
+        if exp == "fw":
+            dirs = [Path(root) / "fw-s42"]
+        arms = {}
+        for a in ARMS:
+            vals = collections.defaultdict(list)
+            for d in dirs:
+                m = arm_metrics(d, a)
+                o = load(d / a / "ood.json")
+                if m is None or o is None:
+                    continue
+                for k, v in m.items():
+                    vals[k].append(v)
+                for s in OOD:
+                    vals[f"f1/{s}"].append(o["sets"][s][KEY]["f1"])
+                    vals[f"fpr/{s}"].append(o["sets"][s][KEY]["absent_query_fpr"])
+                    vals[f"ece_pred/{s}"].append(o["sets"][s][KEY]["ece_predicted"])
+            if vals:
+                arms[a] = {k: {"mean": statistics.mean(v),
+                               "std": statistics.stdev(v) if len(v) > 1 else 0.0, "n": len(v)}
+                           for k, v in vals.items()}
+        out[exp] = arms
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs")
     ap.add_argument("--seeds", nargs="+")
     ap.add_argument("--baseline")
+    ap.add_argument("--root", help="runs root, with --exps")
+    ap.add_argument("--exps", nargs="+")
+    ap.add_argument("--json_out")
     args = ap.parse_args()
+    if args.exps:
+        allres = collect_all(args.root, args.exps, [42, 43, 44])
+        Path(args.json_out).write_text(json.dumps(allres, indent=1))
+        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_ece_pred"]
+        print("exp/arm".ljust(28) + "".join(c.rjust(16) for c in cols))
+        for exp, arms in allres.items():
+            for a, m in arms.items():
+                print(f"{exp + '/' + a:28s}" + "".join(
+                    f"{m[c]['mean']:.4f}±{m[c]['std']:.4f}".rjust(16) if c in m else " " * 16
+                    for c in cols))
+        return
     if args.seeds:
         seeds_table(args.seeds, args.baseline)
         return

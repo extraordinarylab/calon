@@ -24,7 +24,7 @@ def per_query(encs, outs, T, threshold):
     """Per-label counts and absent-query false-positive rate at sigmoid(z/T) >= threshold."""
     thr_logit = T * float(np.log(threshold / (1 - threshold)))
     counts = collections.defaultdict(lambda: [0, 0, 0])
-    absent_q = absent_fp = 0
+    absent_q = absent_fp = present_q = present_miss = 0
     for e, o in zip(encs, outs):
         pred = decode(e, o.get("dz", o["z"]), thr_logit, o.get("choice"))
         for m, lab in enumerate(e["labels"]):
@@ -37,8 +37,15 @@ def per_query(encs, outs, T, threshold):
             if not g:
                 absent_q += 1
                 absent_fp += bool(p)
+            else:                              # label present: did the model output it at all?
+                present_q += 1
+                present_miss += not p
+    tp, fp, fn = (sum(c[i] for c in counts.values()) for i in range(3))
     return counts, {"absent_queries": absent_q,
-                    "absent_query_fpr": absent_fp / absent_q if absent_q else float("nan")}
+                    "absent_query_fpr": absent_fp / absent_q if absent_q else float("nan"),
+                    "present_queries": present_q,
+                    "present_query_fnr": present_miss / present_q if present_q else float("nan"),
+                    "entity_fn": fn, "entity_miss_rate": fn / (tp + fn) if tp + fn else float("nan")}
 
 
 def overlaps(a, b):

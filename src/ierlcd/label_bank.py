@@ -18,6 +18,8 @@ SOURCE_CONTEXT = {
                 "with 8 coarse entity categories and 66 fine-grained subcategories"),
     "massive": ("slot annotations for short spoken commands to a voice assistant (alarms, "
                 "music, weather, calendar, shopping, transport, smart home and similar)"),
+    "pii": ("personally identifiable information in messages, forms and documents (names, contact "
+            "details, identifiers, addresses, dates)"),
 }
 SYSTEM = ("You write concise label definitions for an entity extraction schema. "
           "Answer with JSON only.")

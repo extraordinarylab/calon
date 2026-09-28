@@ -99,7 +99,7 @@ def main():
     res = {"model": args.model, "name_only": args.name_only, "sets": {}}
     for name in manifest["sets"]:
         rows = read_jsonl(Path(args.ood) / f"{name}.jsonl")
-        tp = fp = fn = absent_q = absent_fp = 0
+        tp = fp = fn = absent_q = absent_fp = present_q = present_miss = 0
         for r in rows:
             labels = ([q["label"] for q in r["queries"]] if args.name_only else
                       {q["label"]: q["description"] or q["label"] for q in r["queries"]})
@@ -109,15 +109,23 @@ def main():
             fp += len(pred - gold)
             fn += len(gold - pred)
             for q in r["queries"]:
+                predicted = any(p[2] == q["label"] for p in pred)
                 if not any(g[2] == q["label"] for g in gold):
                     absent_q += 1
-                    absent_fp += any(p[2] == q["label"] for p in pred)
+                    absent_fp += predicted
+                else:
+                    present_q += 1
+                    present_miss += not predicted
         m = f1(tp, fp, fn)
         m["absent_query_fpr"] = absent_fp / absent_q if absent_q else float("nan")
+        m["present_query_fnr"] = present_miss / present_q if present_q else float("nan")
+        m["entity_miss_rate"] = fn / (tp + fn) if tp + fn else float("nan")
         res["sets"][name] = m
         print(name, {k: round(v, 4) for k, v in m.items()}, flush=True)
     sets = res["sets"]
-    res["macro_f1_crossner"] = sum(v["f1"] for k, v in sets.items() if k.startswith("crossner")) / 5
+    cn = [v["f1"] for k, v in sets.items() if k.startswith("crossner")]
+    res["macro_f1_crossner"] = sum(cn) / len(cn) if cn else float("nan")
+    res["mean_miss_rate"] = sum(v["entity_miss_rate"] for v in sets.values()) / len(sets)
     res["macro_f1_all"] = sum(v["f1"] for v in sets.values()) / len(sets)
     res["mean_absent_fpr"] = sum(v["absent_query_fpr"] for v in sets.values()) / len(sets)
     Path(args.out).write_text(json.dumps(res, indent=2))

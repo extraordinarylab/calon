@@ -63,10 +63,14 @@ def arm_metrics(runs, arm):
         in_nll = sum(v["calibrated@tuned"]["nll_decision"] for v in c["test"].values()) / len(c["test"])
     fpr = [o["sets"][s][KEY]["absent_query_fpr"] for s in OOD]
     ece = [o["sets"][s][KEY]["ece_predicted"] for s in OOD]
+    miss = [1 - o["sets"][s][KEY]["recall"] for s in OOD]          # entity-level false negatives
+    qfnr = [o["sets"][s][KEY].get("present_query_fnr") for s in OOD]
     return {"in_f1": in_f1, "in_nll": in_nll, "ood_cn": o[f"macro_f1_crossner[{KEY}]"],
             "ood_all": o[f"macro_f1_all[{KEY}]"], "mit_movie": o["sets"]["mit_movie"][KEY]["f1"],
             "mit_rest": o["sets"]["mit_restaurant"][KEY]["f1"],
-            "ood_fpr": sum(fpr) / len(fpr), "ood_ece_pred": sum(ece) / len(ece)}
+            "ood_fpr": sum(fpr) / len(fpr), "ood_ece_pred": sum(ece) / len(ece),
+            "ood_miss": sum(miss) / len(miss),
+            **({"ood_qfnr": sum(qfnr) / len(qfnr)} if all(x is not None for x in qfnr) else {})}
 
 
 def seeds_table(seed_dirs, baseline):
@@ -119,6 +123,12 @@ def collect_all(root, exps, seeds):
                         vals[f"test/{src}"].append(t["calibrated@tuned"]["f1"])
                 elif c:
                     vals["test/finerweb"].append(c["test"]["calibrated@tuned"]["f1"])
+                pii = load(d / a / "ood-pii-desc.json")
+                if pii is not None:                    # separate PII evaluation set
+                    pm = pii["sets"]["pii_ai4privacy"][KEY]
+                    vals["pii_f1"].append(pm["f1"])
+                    vals["pii_fpr"].append(pm["absent_query_fpr"])
+                    vals["pii_miss"].append(1 - pm["recall"])
                 o2 = load(d / a / "ood-name_only.json")
                 if o2 is not None:                     # same model, labels by name only
                     vals["no_desc_ood_all"].append(o2[f"macro_f1_all[{KEY}]"])
@@ -148,16 +158,17 @@ def main():
     if args.exps:
         allres = collect_all(args.root, args.exps, [42, 43, 44])
         Path(args.json_out).write_text(json.dumps(allres, indent=1))
-        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_ece_pred",
-                "no_desc_ood_all", "no_desc_fpr"]
+        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_miss", "ood_qfnr",
+                "ood_ece_pred", "no_desc_ood_all", "no_desc_fpr", "pii_f1", "pii_fpr", "pii_miss"]
         g = Path(args.root) / "gliner2"
         if g.exists():
             print("== GLiNER2 zero-shot baselines (default threshold, same test sets and scoring)")
             for f in sorted(g.glob("*.json")):
                 r = json.loads(f.read_text())
                 sets = " ".join(f"{s.replace('crossner_', 'cn_')[:7]}={v['f1']:.3f}" for s, v in r["sets"].items())
+                miss = sum(1 - v["recall"] for v in r["sets"].values()) / len(r["sets"])
                 print(f"  {f.stem:28s} all={r['macro_f1_all']:.4f} cn={r['macro_f1_crossner']:.4f} "
-                      f"fpr={r['mean_absent_fpr']:.3f} | {sets}")
+                      f"fpr={r['mean_absent_fpr']:.3f} miss={miss:.3f} | {sets}")
         print("exp/arm".ljust(28) + "".join(c.rjust(16) for c in cols))
         for exp, arms in allres.items():
             for a, m in arms.items():

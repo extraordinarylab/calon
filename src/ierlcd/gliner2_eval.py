@@ -37,6 +37,14 @@ def spans_of(result, text):
     return out
 
 
+def _group(items):
+    """[{label, start, end, ...}] -> {label: [items]}"""
+    out = {}
+    for d in items:
+        out.setdefault(d["label"], []).append(d)
+    return out
+
+
 def f1(tp, fp, fn):
     p = tp / (tp + fp) if tp + fp else 0.0
     r = tp / (tp + fn) if tp + fn else 0.0
@@ -49,16 +57,44 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--name_only", action="store_true")
+    ap.add_argument("--backend", default="gliner2", choices=["gliner2", "gliformer"])
     args = ap.parse_args()
-    try:                                   # newer releases expose AutoExtractor
-        from gliner2 import AutoExtractor as Loader
-    except ImportError:
-        from gliner2 import GLiNER2 as Loader
-    model = Loader.from_pretrained(args.model)
-    try:
-        model = model.to("cuda")
-    except Exception:
-        pass
+    if args.backend == "gliformer":
+        import torch
+        from gliformer import GLiFormer
+        model = GLiFormer.from_pretrained(args.model, load_tokenizer=True).to("cuda").eval()
+        desc_ok = [None]
+
+        def extract(text, labels):
+            """GLiFormer returns [{text, label, start, end, score}]; descriptions are
+            tried as a {label: description} mapping and, if refused, run() stops."""
+            if isinstance(labels, dict):
+                try:
+                    out = model.predict_entities(text, labels, threshold=0.5)
+                    desc_ok[0] = True
+                except Exception as exc:
+                    desc_ok[0] = False
+                    raise SystemExit(f"descriptions not supported by gliformer: {exc!r}")
+            else:
+                with torch.no_grad():
+                    out = model.predict_entities(text, labels, threshold=0.5)
+            return {"entities": _group(out or [])}
+    else:
+        try:                                   # newer releases expose AutoExtractor
+            from gliner2 import AutoExtractor as Loader
+        except ImportError:
+            from gliner2 import GLiNER2 as Loader
+        model = Loader.from_pretrained(args.model)
+        try:
+            model = model.to("cuda")
+        except Exception:
+            pass
+
+        def extract(text, labels):
+            try:
+                return model.extract_entities(text, labels, include_spans=True, include_confidence=True)
+            except TypeError:
+                return model.extract_entities(text, labels)
     manifest = json.loads((Path(args.ood) / "manifest.json").read_text())
     res = {"model": args.model, "name_only": args.name_only, "sets": {}}
     for name in manifest["sets"]:
@@ -67,11 +103,7 @@ def main():
         for r in rows:
             labels = ([q["label"] for q in r["queries"]] if args.name_only else
                       {q["label"]: q["description"] or q["label"] for q in r["queries"]})
-            try:
-                out = model.extract_entities(r["text"], labels, include_spans=True, include_confidence=True)
-            except TypeError:
-                out = model.extract_entities(r["text"], labels)
-            pred = spans_of(out, r["text"])
+            pred = spans_of(extract(r["text"], labels), r["text"])
             gold = {(e["start"], e["end"], e["label"]) for e in r["entities"]}
             tp += len(pred & gold)
             fp += len(pred - gold)

@@ -1,3 +1,13 @@
+## 跟使用者溝通：用人話
+
+使用者看不懂技術細節堆疊的說明。回報時：
+
+- 用繁體中文白話講，不要中英夾雜；非用不可的術語（例如 F1、seed）第一次出現時用一句話解釋。
+- 先講結論：現在在做什麼、結果是好是壞、下一步是什麼、大概多久。
+- 用具體例子取代抽象描述（例如「模型把『Maya』判成人名的機率」，而不是「span–label logit」）。
+- 不要列出 job ID、檔案路徑、參數名稱，除非使用者問起。
+- 一次回報控制在幾句話或一張小表；細節等使用者問再講。
+
 ## Never compute on the login node
 
 Development, smoke tests and debugging go to the **interactive** partition.

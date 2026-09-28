@@ -7,7 +7,7 @@ from pathlib import Path
 ARMS = ["warmup", "bce-s0.2", "bce_scaled-s0.2", "direct-s0.2", "pg-s0.2", "direct-s1.0",
         "pg-s1.0", "direct-s2.0", "pg-s2.0",
         "direct-s0.2-sph", "pg-s0.2-sph", "direct-s1.0-sph", "pg-s1.0-sph", "direct-s2.0-sph",
-        "pg-s2.0-sph", "bce-12k", "rlcd-12k"]
+        "pg-s2.0-sph", "bce-12k", "rlcd-12k", "bce-dd0", "bce-dd0.3", "rlcd-dd0", "rlcd-dd0.3"]
 OOD = ["crossner_ai", "crossner_literature", "crossner_music", "crossner_politics",
        "crossner_science", "mit_movie", "mit_restaurant"]
 KEY = "calibrated@fw_tuned"
@@ -117,6 +117,11 @@ def collect_all(root, exps, seeds):
                         vals[f"test/{src}"].append(t["calibrated@tuned"]["f1"])
                 elif c:
                     vals["test/finerweb"].append(c["test"]["calibrated@tuned"]["f1"])
+                o2 = load(d / a / "ood-name_only.json")
+                if o2 is not None:                     # same model, labels by name only
+                    vals["no_desc_ood_all"].append(o2[f"macro_f1_all[{KEY}]"])
+                    vals["no_desc_ood_cn"].append(o2[f"macro_f1_crossner[{KEY}]"])
+                    vals["no_desc_fpr"].append(sum(o2["sets"][s][KEY]["absent_query_fpr"] for s in OOD) / len(OOD))
                 for s in OOD:
                     vals[f"f1/{s}"].append(o["sets"][s][KEY]["f1"])
                     vals[f"fpr/{s}"].append(o["sets"][s][KEY]["absent_query_fpr"])
@@ -141,14 +146,23 @@ def main():
     if args.exps:
         allres = collect_all(args.root, args.exps, [42, 43, 44])
         Path(args.json_out).write_text(json.dumps(allres, indent=1))
-        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_ece_pred"]
+        cols = ["in_f1", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_ece_pred",
+                "no_desc_ood_all", "no_desc_fpr"]
+        g = Path(args.root) / "gliner2"
+        if g.exists():
+            print("== GLiNER2 zero-shot baselines (default threshold, same test sets and scoring)")
+            for f in sorted(g.glob("*.json")):
+                r = json.loads(f.read_text())
+                sets = " ".join(f"{s.replace('crossner_', 'cn_')[:7]}={v['f1']:.3f}" for s, v in r["sets"].items())
+                print(f"  {f.stem:28s} all={r['macro_f1_all']:.4f} cn={r['macro_f1_crossner']:.4f} "
+                      f"fpr={r['mean_absent_fpr']:.3f} | {sets}")
         print("exp/arm".ljust(28) + "".join(c.rjust(16) for c in cols))
         for exp, arms in allres.items():
             for a, m in arms.items():
                 print(f"{exp + '/' + a:28s}" + "".join(
                     f"{m[c]['mean']:.4f}±{m[c]['std']:.4f}".rjust(16) if c in m else " " * 16
                     for c in cols))
-        for arm in ("warmup", "bce-s0.2", "bce-12k", "rlcd-12k"):
+        for arm in ("warmup", "bce-s0.2", "bce-12k", "rlcd-12k", "bce-dd0", "bce-dd0.3", "rlcd-dd0", "rlcd-dd0.3"):
             if not any(arm in arms for arms in allres.values()):
                 continue
             print(f"== per OOD set F1, arm {arm} (mean over seeds)")

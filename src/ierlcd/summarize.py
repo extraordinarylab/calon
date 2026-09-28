@@ -103,7 +103,8 @@ def collect_all(root, exps, seeds):
         if exp == "fw":
             dirs = [Path(root) / "fw-s42"]
         arms = {}
-        for a in ARMS:
+        found = sorted({p.parent.name for d in dirs for p in d.glob("*/ood.json")})
+        for a in [x for x in ARMS if x in found] + [x for x in found if x not in ARMS]:
             vals = collections.defaultdict(list)
             for d in dirs:
                 m = arm_metrics(d, a)

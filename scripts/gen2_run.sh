@@ -14,6 +14,6 @@ conda activate ie-rlcd-vllm
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 TASK=${TASK:?}; NSHARDS=${NSHARDS:?}
-EXTRA=""; case $TASK in r2|n) EXTRA="--max-tokens 768";; g) EXTRA="--max-tokens 2048";; esac
+EXTRA=""; case $TASK in r2|n) EXTRA="--max-tokens 768";; g|g2) EXTRA="--max-tokens 2048";; esac
 python -m ierlcd.llm_gen2 run --task $TASK --shard $SLURM_ARRAY_TASK_ID --num-shards $NSHARDS \
   $EXTRA 2>&1 | grep -E "^shard|^chunk|Error|error" | cut -c1-200

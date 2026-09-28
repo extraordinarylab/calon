@@ -62,6 +62,30 @@ Finally list 3 to 5 further entity types that are relevant to {domain} but do no
 
 Return JSON only: {{"text": "...", "types": {{"type name": "definition"}}, "entities": [{{"text": "...", "type": "..."}}], "absent_types": {{"type name": "definition"}}}}"""
 
+G2_GROUPS = {   # round-3 targeted synthetic data: no target-dataset examples or labels
+    "music": (["pop music", "rock and metal", "hip hop and rap", "jazz and blues", "classical music and opera",
+               "electronic and dance music", "country and folk music", "K-pop and J-pop", "music festivals and tours",
+               "record labels and the music industry", "musical instruments and gear", "film and game soundtracks",
+               "music awards and charts", "music history", "songwriting and production"],
+              ["encyclopedia-style paragraph", "news article", "album review", "artist biography",
+               "concert review", "interview excerpt", "forum discussion post", "liner notes"]),
+    "literature": (["classic novels", "contemporary fiction", "poetry", "science fiction and fantasy",
+                    "crime and mystery fiction", "children's and young adult books", "literary awards and prizes",
+                    "publishing houses and magazines", "drama and playwrights", "comics and graphic novels",
+                    "literary movements and history", "non-fiction and biography", "translation and world literature"],
+                   ["encyclopedia-style paragraph", "book review", "author biography", "news article",
+                    "literary criticism excerpt", "reading-group discussion post", "publisher catalogue entry"]),
+    "spoken": (["finding a movie to watch", "movie trivia", "booking a restaurant", "finding a place to eat",
+                "hotel booking", "flights and trains", "playing music", "podcasts and audiobooks", "shopping",
+                "local events and tickets", "weather and time", "navigation and traffic", "sports scores",
+                "recipes and cooking", "smart home"],
+               ["spoken request to a voice assistant", "search query typed into a phone",
+                "spoken question to a voice assistant", "chat message to a booking assistant"]),
+}
+G2_EXTRA = """
+Include at least one general type together with more specific subtypes of it (for example a general person type and a more specific role); annotate each mention only with the most specific type that applies."""
+SPOKEN_LENGTHS = [6, 10, 15, 25]
+
 C2_EXTRA = """
 For diversity: give each new example a different, specific sub-topic that the examples above do not cover, and vary sentence structure and length."""
 
@@ -169,6 +193,22 @@ def prepare_g(args):
     print(f"g requests {min(args.n, len(reqs))} over {len(cells)} genre x domain cells")
 
 
+def prepare_g2(args):
+    rng = random.Random(args.seed + 2)
+    reqs, k = [], 0
+    per_group = args.n // len(G2_GROUPS)
+    for group, (domains, genres) in G2_GROUPS.items():
+        cells = [(g, d) for g in genres for d in domains]
+        for j in range(per_group):
+            g, d = cells[j % len(cells)]
+            length = rng.choice(SPOKEN_LENGTHS if group == "spoken" else LENGTHS)
+            reqs.append({"id": f"g2:{k}", "group": group, "genre": g, "domain": d, "length": length})
+            k += 1
+    rng.shuffle(reqs)
+    write_jsonl(S2 / "g2_requests.jsonl", reqs)
+    print(f"g2 requests {len(reqs)}: " + ", ".join(f"{g} {per_group}" for g in G2_GROUPS))
+
+
 def prepare_c2(args):
     pools = seed_pool()
     reqs = []
@@ -262,6 +302,8 @@ def prepare_n(args):
 def build_prompt(task, r):
     if task == "g":
         return G_PROMPT.format(genre=r["genre"], domain=r["domain"], length=r["length"])
+    if task == "g2":
+        return G_PROMPT.format(genre=r["genre"], domain=r["domain"], length=r["length"]) + G2_EXTRA
     if task == "r1":
         return A1_PROMPT.format(text=r["text"])
     if task in ("r2", "n"):
@@ -288,7 +330,7 @@ def run(args):
     llm = LLM(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
               gpu_memory_utilization=0.9, max_num_seqs=256, seed=0,
               limit_mm_per_prompt={"image": 0, "video": 0})
-    sampled = args.task in ("g", "c2")
+    sampled = args.task in ("g", "g2", "c2")
     for c in range(0, len(todo), args.chunk):
         chunk = todo[c:c + args.chunk]
         t0 = time.time()
@@ -341,20 +383,35 @@ def absent_answers(output, asked):
 
 
 def assemble(args):
+    """Round 2: synth_g, synth_r, synth_c into data/mix2, then absent labels (n)
+    added to FiNERWeb and Pile train rows."""
     from transformers import AutoTokenizer
-    from .prepare_data import SPLITS, norm_text, sha, split_groups, word_ngrams
-    from .prepare_mix import contamination_filter, find_all, fixed_eval_queries
+    from .prepare_data import word_ngrams
+    from .prepare_mix import find_all
     stats = collections.Counter()
     tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
     mix = ROOT / "data/mix2"
-    rows_by = {}
+    rows_by = {"synth_g": g_rows("g", "synth_g", stats, find_all),
+               "synth_r": r_rows(stats, find_all),
+               "synth_c": c_rows(stats, find_all, word_ngrams)}
+    summary = finalize(args, rows_by, stats, tok, mix)
+    apply_n(mix, stats, summary, find_all)
+    write_summary(summary, stats, "assemble_summary.json")
 
-    # g: synthetic genre x domain texts with their own schema
+
+def write_summary(summary, stats, name):
+    summary["stats"] = dict(stats)
+    (S2 / name).write_text(json.dumps(summary, indent=1))
+    print(json.dumps(summary, indent=1)[:5000])
+
+
+def g_rows(task, source, stats, find_all):
+    """Parse synthetic genre x domain generations (their own schema) into rows."""
     rows = []
-    for rid, o in load_outputs("g").items():
+    for rid, o in load_outputs(task).items():
         js = parse_json(o["output"])
         if not isinstance(js, dict) or not isinstance(js.get("text"), str):
-            stats["g_parse_fail"] += 1
+            stats[f"{task}_parse_fail"] += 1
             continue
         text = js["text"].strip()
         types = {clean_type(k): str(v) for k, v in (js.get("types") or {}).items()}
@@ -369,7 +426,7 @@ def assemble(args):
                 occ = align(text, by[t], find_all)
                 if occ is None:
                     queries.append(mk_query(t, d, "unknown", "llm_unaligned"))
-                    stats["g_unaligned_types"] += 1
+                    stats[f"{task}_unaligned_types"] += 1
                 else:
                     queries.append(mk_query(t, d, "positive", "llm_generated"))
                     ents += [{"start": s, "end": e, "label": t} for s, e in occ]
@@ -379,11 +436,24 @@ def assemble(args):
             if t not in types:
                 queries.append(mk_query(t, d, "explicit_absent", "llm_listed_absent"))
         if any(q["status"] == "positive" for q in queries):
-            rows.append({"id": f"synth_g:{rid}", "source": "synth_g", "text": text, "queries": queries,
+            rows.append({"id": f"{source}:{rid}", "source": source, "text": text, "queries": queries,
                          "entities": dedup_entities(ents)})
-    rows_by["synth_g"] = rows
+    return rows
 
-    # r: real text, r1 open types + r2 absent answers (hard negatives)
+
+def assemble_g2(args):
+    """Build data/mix2/synth_g2 (round-3 music / literature / spoken synthetic text) only."""
+    from transformers import AutoTokenizer
+    from .prepare_mix import find_all
+    stats = collections.Counter()
+    tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
+    rows_by = {"synth_g2": g_rows("g2", "synth_g2", stats, find_all)}
+    summary = finalize(args, rows_by, stats, tok, ROOT / "data/mix2")
+    write_summary(summary, stats, "assemble_g2_summary.json")
+
+
+def r_rows(stats, find_all):
+    """Real text: r1 open types + r2 absent answers (hard negatives)."""
     reqs = {r["id"]: r for r in read_jsonl(S2 / "r1_requests.jsonl")}
     r2reqs = {r["id"]: r for r in read_jsonl(S2 / "r2_requests.jsonl")} if (S2 / "r2_requests.jsonl").exists() else {}
     r2 = load_outputs("r2")
@@ -417,9 +487,11 @@ def assemble(args):
         if any(q["status"] != "unknown" for q in queries):
             rows.append({"id": f"synth_r:{pid}", "source": "synth_r", "genre": reqs[pid]["genre"],
                          "text": text, "queries": queries, "entities": dedup_entities(ents)})
-    rows_by["synth_r"] = rows
+    return rows
 
-    # c: round-1 seeded rows (train only) plus c2
+
+def c_rows(stats, find_all, word_ngrams):
+    """Target-style rows (non zero-shot): round-1 seeded train rows plus c2."""
     reqs = {r["id"]: r for r in read_jsonl(S2 / "c2_requests.jsonl")}
     pools = seed_pool()
     seed_grams = {d: [word_ngrams(r["input"]) for r in pool] for d, pool in pools.items()}
@@ -459,8 +531,13 @@ def assemble(args):
             rows.append({"id": f"synth_c:{rid}:{k}", "source": "synth_c", "domain": req["domain"],
                          "text": text, "queries": queries, "entities": dedup_entities(ents)})
     old = ROOT / "data/mix/synth_c/train.jsonl"
-    rows_by["synth_c"] = rows + (read_jsonl(old) if old.exists() else [])
+    return rows + (read_jsonl(old) if old.exists() else [])
 
+
+def finalize(args, rows_by, stats, tok, mix):
+    """Schema / length filters, OOD-test dedup, 80/10/5/5 split, write per source."""
+    from .prepare_data import SPLITS, norm_text, sha, split_groups
+    from .prepare_mix import contamination_filter, fixed_eval_queries
     ood_test = [r["text"] for f in (ROOT / "data/ood").glob("*.jsonl") for r in read_jsonl(f)]
     summary = {}
     for src, rows in rows_by.items():
@@ -484,8 +561,11 @@ def assemble(args):
             info[s] = {"rows": len(part), "status": dict(collections.Counter(
                 q["status"] for r in part for q in r["queries"]))}
         summary[src] = info
+    return summary
 
-    # n: add verified absent labels to FiNERWeb and Pile train rows
+
+def apply_n(mix, stats, summary, find_all):
+    """Add verified absent labels (task n) to FiNERWeb and Pile train rows."""
     nreqs = {r["id"]: r for r in read_jsonl(S2 / "n_requests.jsonl")} if (S2 / "n_requests.jsonl").exists() else {}
     nout = load_outputs("n")
     for src in ("finerweb", "pile"):
@@ -510,9 +590,6 @@ def assemble(args):
         write_jsonl(path, rows)
         summary[f"{src}_train_after_n"] = {"rows": len(rows), "status": dict(collections.Counter(
             q["status"] for r in rows for q in r["queries"]))}
-    summary["stats"] = dict(stats)
-    (S2 / "assemble_summary.json").write_text(json.dumps(summary, indent=1))
-    print(json.dumps(summary, indent=1)[:5000])
 
 
 def main():
@@ -526,8 +603,12 @@ def main():
     sub.add_parser("prepare-n")
     p = sub.add_parser("assemble"); p.add_argument("--seed", type=int, default=42)
     p.add_argument("--max-tokens", type=int, default=1024)
+    p = sub.add_parser("prepare-g2"); p.add_argument("--n", type=int, default=40000)
+    p.add_argument("--seed", type=int, default=42)
+    p = sub.add_parser("assemble-g2"); p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--max-tokens", type=int, default=1024)
     p = sub.add_parser("run")
-    p.add_argument("--task", choices=["g", "c2", "r1", "r2", "n"], required=True)
+    p.add_argument("--task", choices=["g", "g2", "c2", "r1", "r2", "n"], required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--num-shards", type=int, default=1)
@@ -538,7 +619,8 @@ def main():
     args = ap.parse_args()
     S2.mkdir(parents=True, exist_ok=True)
     {"fetch-real": fetch_real, "prepare-g": prepare_g, "prepare-c2": prepare_c2, "prepare-r2": prepare_r2,
-     "prepare-n": prepare_n, "assemble": assemble, "run": run}[args.cmd](args)
+     "prepare-n": prepare_n, "assemble": assemble, "prepare-g2": prepare_g2, "assemble-g2": assemble_g2,
+     "run": run}[args.cmd](args)
 
 
 if __name__ == "__main__":

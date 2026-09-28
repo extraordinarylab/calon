@@ -99,6 +99,55 @@ def fine_only(rows, coarse):
     return out
 
 
+PRECEDENCE_NOTE = " Use this type only when no more specific type in the list applies."
+
+
+def fewnerd_precedence(rows, data):
+    """Few-NERD with coarse and fine types asked together, most specific wins:
+    a mention of a specific fine type (politician) keeps only that type; a
+    mention of an "other X" fine type is labelled with the coarse type X instead,
+    and the "other X" queries are dropped. Coarse descriptions get a precedence note."""
+    inv = json.loads((Path(data) / "inventory.json").read_text())["fewnerd"]
+    coarse = {x["name"] for x in inv if not x.get("parent")}
+    other_to_coarse = {x["name"]: x["parent"] for x in inv
+                       if x.get("parent") and x["name"] == f"other {x['parent']}"}
+    out = []
+    for r in rows:
+        spans = collections.defaultdict(set)
+        for e in r["entities"]:
+            spans[(e["start"], e["end"])].add(e["label"])
+        ents = []
+        for (s, t), labs in spans.items():
+            fine = [l for l in labs if l not in coarse]
+            for l in fine:
+                ents.append({"start": s, "end": t, "label": other_to_coarse.get(l, l)})
+            if not fine:                               # coarse-only mention (should not occur)
+                ents += [{"start": s, "end": t, "label": l} for l in labs]
+        present = {e["label"] for e in ents}
+        queries = []
+        for q in r["queries"]:
+            if q["label"] in other_to_coarse:
+                continue
+            q = dict(q)
+            if q["label"] in coarse:
+                q["description"] = (q["description"] or "") + PRECEDENCE_NOTE
+            if q["status"] in ("positive", "scope_assumed_absent"):
+                q["status"] = "positive" if q["label"] in present else "scope_assumed_absent"
+            queries.append(q)
+        out.append({**r, "queries": queries, "entities": ents})
+    return out
+
+
+def fewnerd_transform(data, mode):
+    """mode: both (as stored) | fine (fine types only) | precedence."""
+    if mode == "fine":
+        c = fewnerd_coarse_names(data)
+        return lambda rows: fine_only(rows, c)
+    if mode == "precedence":
+        return lambda rows: fewnerd_precedence(rows, data)
+    return None
+
+
 def filter_long(rows, tok, what):
     """Drop rows whose text exceeds one 512-token window under this tokenizer
     (windowing is not implemented) and say how many; datasets are pre-filtered
@@ -111,12 +160,13 @@ def filter_long(rows, tok, what):
     return kept
 
 
-def load_eval(data, split, sources, tok, W, limit, fewnerd_fine_only=False):
+def load_eval(data, split, sources, tok, W, limit, fewnerd_mode="both"):
     out = {}
+    tf = fewnerd_transform(data, fewnerd_mode)
     for src in sources:
         path = Path(data) / src / f"{split}.jsonl"
         rows = filter_long([json.loads(line) for line in open(path)][:limit], tok, f"{src}/{split}")
-        if fewnerd_fine_only and src == "fewnerd":
-            rows = fine_only(rows, fewnerd_coarse_names(data))
+        if tf and src == "fewnerd":
+            rows = tf(rows)
         out[src] = [encode_row(r, tok, W) for r in rows]
     return out

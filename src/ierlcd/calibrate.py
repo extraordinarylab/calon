@@ -14,7 +14,7 @@ from transformers import AutoTokenizer
 
 from .collator import Collator, add_control_tokens
 from .evaluate import f1, f1_counts, metrics, predict, reliability, rlcd_brier, with_temperature
-from .mixdata import fewnerd_coarse_names, fine_only
+from .mixdata import fewnerd_transform
 from .model import SpanLabelModel
 from .train import encode_split
 
@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
     ap.add_argument("--fewnerd_fine_only", action="store_true")
+    ap.add_argument("--fewnerd_mode", default="both", choices=["both", "fine", "precedence"])
     ap.add_argument("--decode", default="label", choices=["label", "entity"])
     args = ap.parse_args()
     tok = AutoTokenizer.from_pretrained(args.encoder)
@@ -60,13 +61,15 @@ def main():
     model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
     sources = args.sources.split(",")
     rlcd = args.head == "rlcd"
-    coarse = fewnerd_coarse_names(args.data) if args.fewnerd_fine_only else None
+    if args.fewnerd_fine_only:
+        args.fewnerd_mode = "fine"
+    fewnerd_tf = fewnerd_transform(args.data, args.fewnerd_mode)
 
     # T and thresholds are fit on dev_calib pooled over sources (equal rows per source)
     enc, outs = {}, {}
     for split in ("dev_calib", "test"):
         for src in sources:
-            tf = (lambda rows: fine_only(rows, coarse)) if coarse and src == "fewnerd" else None
+            tf = fewnerd_tf if src == "fewnerd" else None
             e = encode_split(Path(args.data) / src / f"{split}.jsonl", tok, args.W, args.limit, tf)
             enc[(split, src)] = e
             outs[(split, src)] = predict(model, e, collate, "cuda", batch_size=16)

@@ -38,6 +38,22 @@ def test_loss_matches_manual():
     assert torch.allclose(got, manual(u, y), atol=1e-6)
 
 
+def test_none_weight_is_a_weighted_row_mean():
+    y, valid, qmask, cmask = setup()
+    u = torch.randn(1, 3, 3, generator=torch.Generator().manual_seed(4))
+    assert torch.allclose(rlcd_loss(u, y, valid, qmask, cmask, none_weight=1.0), manual(u, y), atol=1e-6)
+    # cand 2 is the only "none" span: weight 0.5 -> (l0 + l1 + 0.5 l2) / 2.5
+    per = []
+    for c in range(3):
+        p = F.softmax(u[0, :, c], 0)
+        gold = [1 + m for m in range(2) if y[0, m, c] > 0] or [0]
+        t = torch.zeros_like(p)
+        t[gold] = 1 / len(gold)
+        per.append(-torch.log(p[gold].sum()) + 0.5 * ((p - t) ** 2).sum())
+    want = (per[0] + per[1] + 0.5 * per[2]) / 2.5
+    assert torch.allclose(rlcd_loss(u, y, valid, qmask, cmask, none_weight=0.5), want, atol=1e-6)
+
+
 def test_padding_labels_and_candidates_are_ignored():
     y, valid, qmask, cmask = setup()
     u = torch.randn(1, 3, 3, generator=torch.Generator().manual_seed(1))

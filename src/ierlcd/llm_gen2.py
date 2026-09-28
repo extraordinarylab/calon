@@ -19,6 +19,7 @@ Subcommands: fetch-real, prepare-g, prepare-c2, prepare-r2, prepare-n, run, asse
 import argparse
 import collections
 import json
+import os
 import random
 import re
 import time
@@ -30,6 +31,7 @@ from .llm_annotate import (A1_PROMPT, A2_PROMPT, C_DOMAIN_NAMES, C_PROMPT, CROSS
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 S2 = ROOT / "synth2"
+MIX_DIR = Path(os.environ.get("IE_MIX", str(ROOT / "data/mix2")))   # target data dir for fill / g3
 PROMPT_VERSION = "v2"
 STOP = set("a an the of and or for to in on at by with from other type name names".split())
 
@@ -85,6 +87,35 @@ G2_GROUPS = {   # round-3 targeted synthetic data: no target-dataset examples or
 G2_EXTRA = """
 Include at least one general type together with more specific subtypes of it (for example a general person type and a more specific role); annotate each mention only with the most specific type that applies."""
 SPOKEN_LENGTHS = [6, 10, 15, 25]
+
+GENRES3 = GENRES + ["legal contract summary", "government notice", "patent abstract", "wiki talk page comment",
+                    "product specification sheet", "hospital discharge summary", "sports match report", "obituary",
+                    "museum exhibit label", "travel guide paragraph", "restaurant menu description", "movie synopsis",
+                    "tweet thread", "answer on a question-and-answer site", "tutorial step", "software changelog entry",
+                    "science news article", "court judgment excerpt"]
+DOMAINS3 = DOMAINS + ["ophthalmology", "dentistry", "mental health", "nutrition", "tennis", "association football",
+                      "basketball", "baseball", "cricket", "motorsport", "cycling", "the Olympic Games", "chess",
+                      "board games", "anime and manga", "theatre", "dance", "photography", "sculpture", "museums",
+                      "classical antiquity", "medieval history", "military history", "genealogy", "urban planning",
+                      "maritime industry", "railways", "space industry", "robotics", "semiconductors",
+                      "cloud computing", "open-source software", "mobile apps", "social networks", "e-sports",
+                      "tax law", "intellectual property", "immigration", "criminal justice", "human rights",
+                      "international relations", "diplomacy", "local government", "labor unions", "supply chains",
+                      "wine and beverages", "coffee and tea", "gardening", "pets", "zoology", "botany",
+                      "marine biology", "ecology", "geology", "meteorology", "oceanography", "epidemiology",
+                      "neuroscience", "materials science", "mathematics"]
+FILL_PROMPT = """Text:
+{text}
+
+Entity types:
+{types}
+
+Current annotations:
+{current}
+
+Some mentions of these types may be missing from the current annotations. List only the missing mentions, exactly as they appear in the text, per type; use [] when nothing is missing for a type.
+Return JSON only: {{"type name": ["span", ...]}}"""
+FILL_SOURCES = ["finerweb", "pile", "synth_a", "synth_r", "synth_g", "synth_g2"]
 
 C2_EXTRA = """
 For diversity: give each new example a different, specific sub-topic that the examples above do not cover, and vary sentence structure and length."""
@@ -209,6 +240,76 @@ def prepare_g2(args):
     print(f"g2 requests {len(reqs)}: " + ", ".join(f"{g} {per_group}" for g in G2_GROUPS))
 
 
+def prepare_g3(args):
+    """Round-4 diverse synthetic texts: 40 genres x 120 domains, general + specific types."""
+    rng = random.Random(args.seed + 3)
+    cells = [(g, d) for g in GENRES3 for d in DOMAINS3]
+    reqs = [{"id": f"g3:{k}", "genre": cells[k % len(cells)][0], "domain": cells[k % len(cells)][1],
+             "length": rng.choice(LENGTHS)} for k in range(args.n)]
+    rng.shuffle(reqs)
+    write_jsonl(S2 / "g3_requests.jsonl", reqs)
+    print(f"g3 requests {len(reqs)} over {len(cells)} genre x domain cells")
+
+
+def prepare_fill(args):
+    """Missing-mention check for LLM-annotated and FiNERWeb/Pile train rows (data/mix2)."""
+    reqs = []
+    for src in FILL_SOURCES:
+        for r in read_jsonl(MIX_DIR / src / "train.jsonl"):
+            qs = [q for q in r["queries"] if q["status"] in ("positive", "explicit_absent")]
+            if not qs:
+                continue
+            reqs.append({"id": r["id"], "source": src, "text": r["text"],
+                         "types": [(q["label"], q["description"]) for q in qs],
+                         "current": {q["label"]: [r["text"][e["start"]:e["end"]] for e in r["entities"]
+                                                  if e["label"] == q["label"]] for q in qs}})
+    write_jsonl(S2 / "fill_requests.jsonl", reqs)
+    print("fill requests", len(reqs), dict(collections.Counter(r["source"] for r in reqs)))
+
+
+def apply_fill(args):
+    """Add Qwen-found missing mentions to the train rows (backup *.pre_fill)."""
+    from .prepare_mix import find_all
+    reqs = {r["id"]: r for r in read_jsonl(S2 / "fill_requests.jsonl")}
+    outs = load_outputs("fill")
+    stats = collections.Counter()
+    for src in FILL_SOURCES:
+        path = MIX_DIR / src / "train.jsonl"
+        rows = read_jsonl(path)
+        for r in rows:
+            o = outs.get(r["id"])
+            if o is None or r["id"] not in reqs:
+                continue
+            js = parse_json(o["output"])
+            if not isinstance(js, dict):
+                stats[f"{src}_parse_fail"] += 1
+                continue
+            ans = {clean_type(k): v for k, v in js.items() if isinstance(v, list)}
+            have = {(e["start"], e["end"], e["label"]) for e in r["entities"]}
+            for q in r["queries"]:
+                v = [str(x).strip() for x in ans.get(clean_type(q["label"]), []) if str(x).strip()]
+                if not v or q["status"] not in ("positive", "explicit_absent"):
+                    continue
+                occ = align(r["text"], v, find_all)
+                if occ is None:
+                    stats[f"{src}_unaligned"] += 1
+                    continue
+                new = [(s, e, q["label"]) for s, e in occ if (s, e, q["label"]) not in have]
+                if not new:
+                    continue
+                if q["status"] == "explicit_absent":
+                    stats[f"{src}_absent_to_positive"] += 1
+                    q["status"], q["supervision_origin"] = "positive", "llm_fill_found"
+                have |= set(new)
+                stats[f"{src}_added_mentions"] += len(new)
+            r["entities"] = sorted(({"start": s, "end": e, "label": l} for s, e, l in have),
+                                   key=lambda x: (x["start"], x["label"]))
+        path.rename(path.with_suffix(".jsonl.pre_fill"))
+        write_jsonl(path, rows)
+    (S2 / "fill_summary.json").write_text(json.dumps(dict(stats), indent=1))
+    print(json.dumps(dict(stats)))
+
+
 def prepare_c2(args):
     pools = seed_pool()
     reqs = []
@@ -302,8 +403,12 @@ def prepare_n(args):
 def build_prompt(task, r):
     if task == "g":
         return G_PROMPT.format(genre=r["genre"], domain=r["domain"], length=r["length"])
-    if task == "g2":
+    if task in ("g2", "g3"):
         return G_PROMPT.format(genre=r["genre"], domain=r["domain"], length=r["length"]) + G2_EXTRA
+    if task == "fill":
+        types = "\n".join(f'- "{t}": {d}' if d else f'- "{t}"' for t, d in r["types"])
+        current = "\n".join(f'- "{t}": {json.dumps(v, ensure_ascii=False)}' for t, v in r["current"].items())
+        return FILL_PROMPT.format(text=r["text"], types=types, current=current)
     if task == "r1":
         return A1_PROMPT.format(text=r["text"])
     if task in ("r2", "n"):
@@ -330,7 +435,7 @@ def run(args):
     llm = LLM(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
               gpu_memory_utilization=0.9, max_num_seqs=256, seed=0,
               limit_mm_per_prompt={"image": 0, "video": 0})
-    sampled = args.task in ("g", "g2", "c2")
+    sampled = args.task in ("g", "g2", "g3", "c2")
     for c in range(0, len(todo), args.chunk):
         chunk = todo[c:c + args.chunk]
         t0 = time.time()
@@ -447,9 +552,10 @@ def assemble_g2(args):
     from .prepare_mix import find_all
     stats = collections.Counter()
     tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
-    rows_by = {"synth_g2": g_rows("g2", "synth_g2", stats, find_all)}
-    summary = finalize(args, rows_by, stats, tok, ROOT / "data/mix2")
-    write_summary(summary, stats, "assemble_g2_summary.json")
+    task = getattr(args, "task", "g2")
+    rows_by = {f"synth_{task}": g_rows(task, f"synth_{task}", stats, find_all)}
+    summary = finalize(args, rows_by, stats, tok, MIX_DIR)
+    write_summary(summary, stats, f"assemble_{task}_summary.json")
 
 
 def r_rows(stats, find_all):
@@ -607,8 +713,13 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     p = sub.add_parser("assemble-g2"); p.add_argument("--seed", type=int, default=42)
     p.add_argument("--max-tokens", type=int, default=1024)
+    p.add_argument("--task", default="g2", choices=["g2", "g3"])
+    p = sub.add_parser("prepare-g3"); p.add_argument("--n", type=int, default=370000)
+    p.add_argument("--seed", type=int, default=42)
+    sub.add_parser("prepare-fill")
+    sub.add_parser("apply-fill")
     p = sub.add_parser("run")
-    p.add_argument("--task", choices=["g", "g2", "c2", "r1", "r2", "n"], required=True)
+    p.add_argument("--task", choices=["g", "g2", "g3", "c2", "r1", "r2", "n", "fill"], required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--num-shards", type=int, default=1)
@@ -620,6 +731,7 @@ def main():
     S2.mkdir(parents=True, exist_ok=True)
     {"fetch-real": fetch_real, "prepare-g": prepare_g, "prepare-c2": prepare_c2, "prepare-r2": prepare_r2,
      "prepare-n": prepare_n, "assemble": assemble, "prepare-g2": prepare_g2, "assemble-g2": assemble_g2,
+     "prepare-g3": prepare_g3, "prepare-fill": prepare_fill, "apply-fill": apply_fill,
      "run": run}[args.cmd](args)
 
 

@@ -26,7 +26,7 @@ def rlcd_log_probs(u, label_ok):
     return torch.log_softmax(u.float().masked_fill(~ok, float("-inf")), 1)
 
 
-def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None):
+def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, none_weight=1.0):
     """Plackett-Luce single-choice loss plus multiway Brier score, per span.
 
     Each candidate span chooses one of [none, queried labels]. Target: its gold
@@ -48,12 +48,16 @@ def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None):
     p = logp.exp()
     t = target.float() / target.float().sum(1, keepdim=True).clamp_min(1)
     brier = 0.5 * (p - t).square().sum(1)
-    per_span = torch.where(span_ok, ce + brier_weight * brier, torch.zeros_like(ce))
+    # "none" spans are ~99% of candidates; none_weight < 1 down-weights them. The row
+    # mean is a weighted mean, so none_weight = 1 is exactly the unweighted loss.
+    w = torch.where(has_gold, torch.ones_like(ce), torch.full_like(ce, none_weight))
+    w = torch.where(span_ok, w, torch.zeros_like(w))
+    per_span = torch.where(span_ok, (ce + brier_weight * brier) * w, torch.zeros_like(ce))
     cnt = span_ok.sum(-1)
     active = cnt > 0
     if not bool(active.any()):
         return u.float().sum() * 0
-    per_row = per_span.sum(-1) / cnt.clamp_min(1)
+    per_row = per_span.sum(-1) / w.sum(-1).clamp_min(1e-8)
     if stats is not None:
         sel = span_ok
         stats["rlcd_ce"] = ((torch.where(sel, ce, torch.zeros_like(ce)).sum(-1) / cnt.clamp_min(1))[active].mean().item())

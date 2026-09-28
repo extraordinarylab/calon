@@ -22,11 +22,11 @@ cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 SEED=${SEED:?}; EXP=${EXP:?}; ENCODER=${ENCODER:?}; HEAD=${HEAD:?}; MIXSPEC=${MIXSPEC:?}
 DDROP=${DDROP:-0}; UPDATES=${UPDATES:-3000}; BRIER=${BRIER:-1.0}; FINE=${FINE:-1}
-NAME=${NAME:-$HEAD-dd$DDROP}
-FF=""; [ "$FINE" = 1 ] && FF=--fewnerd_fine_only
+NAME=${NAME:-$HEAD-dd$DDROP}; NONEW=${NONEW:-1.0}
+case "$FINE" in 1) FF="--fewnerd_mode fine";; 2) FF="--fewnerd_mode precedence";; *) FF="--fewnerd_mode both";; esac
 SOURCES=$(echo $MIXSPEC | sed 's/:[0-9.]*//g')
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
-MIX=$ROOT/data/mix2
+MIX=${DATA_DIR:-$ROOT/data/mix2}
 RUNS=$ROOT/runs2/$EXP-s$SEED
 mkdir -p $RUNS
 git rev-parse HEAD > $RUNS/git_commit.txt
@@ -34,7 +34,7 @@ MASTER=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -1)
 srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p \$TMPDIR; \
   torchrun --nnodes=$SLURM_NNODES --nproc_per_node=4 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d \
   --rdzv_endpoint=$MASTER:29500 -m ierlcd.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
-  --encoder $ENCODER --head $HEAD $FF --brier_weight $BRIER --desc_dropout $DDROP --mode bce \
+  --encoder $ENCODER --head $HEAD $FF --brier_weight $BRIER --none_weight $NONEW --desc_dropout $DDROP --mode bce \
   --batch 128 --micro 8 --updates $UPDATES --enc_lr 4e-5 --head_lr 2e-4 --eval_every 500 \
   --workers 12 --seed $SEED" > $RUNS/$NAME.log 2>&1 || {
   # a rendezvous error while ranks shut down must not skip evaluation of a saved model

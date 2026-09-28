@@ -22,11 +22,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
 from .collator import Collator, add_control_tokens, encode_row, load_rows
-from .evaluate import metrics, predict
+from .evaluate import f1, f1_counts, metrics, predict, with_temperature
 from .losses import loss_fn
 from .losses import rlcd_loss
-from .mixdata import (StepDataset, fewnerd_coarse_names, filter_long, fine_only, load_eval,
-                      load_interned, parse_mix, step_schedule)
+from .mixdata import (StepDataset, fewnerd_transform, filter_long, load_eval, load_interned,
+                      parse_mix, step_schedule)
 from .model import SpanLabelModel
 
 
@@ -47,9 +47,24 @@ def encode_split(path, tok, W, limit=None, transform=None):
     return [encode_row(r, tok, W) for r in rows]
 
 
-def evaluate_sources(model, dev, collate, device):
-    res = {src: metrics(encs, predict(model, encs, collate, device, batch_size=16))
-           for src, encs in dev.items()}
+def best_threshold_f1(encs, outs):
+    """F1 at the best of 19 probability thresholds (0.05 ... 0.95)."""
+    return max(f1(*f1_counts(encs, outs, float(np.log(t / (1 - t)))))["f1"]
+               for t in np.linspace(0.05, 0.95, 19))
+
+
+def evaluate_sources(model, dev, collate, device, head="bce"):
+    """Checkpoint selection, identical for both heads: each source's dev F1 at
+    its best threshold, with the decision rule the head is used with (RLCD:
+    entity-level decoding). Round 1-3 selected RLCD with label decoding at 0.5."""
+    res = {}
+    for src, encs in dev.items():
+        outs = predict(model, encs, collate, device, batch_size=16)
+        if head == "rlcd":
+            outs = with_temperature(outs, 1.0, "entity")
+        res[src] = metrics(encs, outs)
+        res[src]["f1_at_0.5"] = res[src]["f1"]
+        res[src]["f1"] = best_threshold_f1(encs, outs)
     res["macro_f1"] = float(np.mean([res[s]["f1"] for s in dev]))
     res["macro_nll"] = float(np.mean([res[s]["nll_row_mean"] for s in dev]))
     return res
@@ -75,7 +90,10 @@ def main():
     ap.add_argument("--head", default="bce", choices=["bce", "rlcd"],
                     help="rlcd: per-span choice over [none, labels], Plackett-Luce + Brier")
     ap.add_argument("--brier_weight", type=float, default=1.0)
-    ap.add_argument("--fewnerd_fine_only", action="store_true")
+    ap.add_argument("--none_weight", type=float, default=1.0,
+                    help="RLCD: loss weight of spans whose answer is 'not an entity'")
+    ap.add_argument("--fewnerd_fine_only", action="store_true", help="same as --fewnerd_mode fine")
+    ap.add_argument("--fewnerd_mode", default="both", choices=["both", "fine", "precedence"])
     ap.add_argument("--desc_dropout", type=float, default=0.0,
                     help="probability of showing a described label by name only (training)")
     ap.add_argument("--enc_lr", type=float, default=2e-5)
@@ -112,10 +130,13 @@ def main():
     t0 = time.time()
     rows = {src: filter_long(load_interned(Path(args.data) / src / "train.jsonl"), tok,
                              f"{src}/train") for src in mix}
-    if args.fewnerd_fine_only and "fewnerd" in rows:
-        rows["fewnerd"] = fine_only(rows["fewnerd"], fewnerd_coarse_names(args.data))
+    if args.fewnerd_fine_only:
+        args.fewnerd_mode = "fine"
+    tf = fewnerd_transform(args.data, args.fewnerd_mode)
+    if tf and "fewnerd" in rows:
+        rows["fewnerd"] = tf(rows["fewnerd"])
     dev = load_eval(args.data, "dev_select", list(mix), tok, args.W, args.eval_limit,
-                    args.fewnerd_fine_only) if main_rank else {}
+                    args.fewnerd_mode) if main_rank else {}
     if main_rank:
         print(f"world={world} loaded train={ {s: len(r) for s, r in rows.items()} } "
               f"dev={ {s: len(d) for s, d in dev.items()} } in {time.time() - t0:.1f}s", flush=True)
@@ -162,7 +183,8 @@ def main():
                 if args.head == "rlcd":
                     loss = rlcd_loss(z, tgt["y"].to(device), tgt["valid"].to(device),
                                      tgt["query_mask"].to(device), tgt["cand_mask"].to(device),
-                                     brier_weight=args.brier_weight, stats=stats)
+                                     brier_weight=args.brier_weight, stats=stats,
+                                     none_weight=args.none_weight)
                 else:
                     loss = loss_fn(z, tgt["y"].to(device), tgt["valid"].to(device), mode=args.mode,
                                    K=args.K, sigma=args.sigma, lam=lam, generator=noise_gen,
@@ -188,7 +210,7 @@ def main():
                 print(json.dumps(rec), flush=True)
         if step % args.eval_every == 0 or step == args.updates:
             if main_rank:
-                res = evaluate_sources(base, dev, collate, device)
+                res = evaluate_sources(base, dev, collate, device, args.head)
                 res["step"] = step
                 res["query_stats_cumulative_rank0"] = dict(query_stats)
                 with open(out / "eval.jsonl", "a") as f:

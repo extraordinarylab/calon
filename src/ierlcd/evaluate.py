@@ -1,0 +1,99 @@
+"""Extraction F1, candidate recall and calibration metrics (SPEC 6)."""
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+
+@torch.no_grad()
+def predict(model, encs, collate, device, batch_size=32):
+    """Run the model; return per-row arrays of logits over supervised decisions."""
+    model.eval()
+    out = []
+    for k in range(0, len(encs), batch_size):
+        chunk = encs[k:k + batch_size]
+        inputs, tgt = collate(chunk)
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            z = model(**{n: v.to(device) for n, v in inputs.items()}).float().cpu()
+        for b, e in enumerate(chunk):
+            M, C = len(e["labels"]), len(e["cands"])
+            out.append({"z": z[b, :M, :C].numpy(), "y": tgt["y"][b, :M, :C].numpy(),
+                        "valid": tgt["valid"][b, :M, :C].numpy()})
+    model.train()
+    return out
+
+
+def decode(e, z, threshold_logit):
+    preds = set()
+    ms, cs = np.nonzero(z >= threshold_logit)
+    for m, c in zip(ms, cs):
+        s, t, _, _ = e["cands"][c]
+        preds.add((s, t, e["labels"][m]))
+    return preds
+
+
+def f1_counts(encs, outs, threshold_logit):
+    tp = fp = fn = 0
+    for e, o in zip(encs, outs):
+        # only supervised queries are scored; FiNERWeb has no unknown queries
+        keep = {lab for lab, sup in zip(e["labels"], e["supervised"]) if sup}
+        pred = {p for p in decode(e, o["z"], threshold_logit) if p[2] in keep}
+        gold = {g for g in e["gold_spans"] if g[2] in keep}
+        tp += len(pred & gold)
+        fp += len(pred - gold)
+        fn += len(gold - pred)
+    return tp, fp, fn
+
+
+def f1(tp, fp, fn):
+    p = tp / (tp + fp) if tp + fp else 0.0
+    r = tp / (tp + fn) if tp + fn else 0.0
+    return {"precision": p, "recall": r, "f1": 2 * p * r / (p + r) if p + r else 0.0}
+
+
+def ece(prob, y, bins=15):
+    if len(prob) == 0:
+        return float("nan")
+    edges = np.linspace(0, 1, bins + 1)
+    idx = np.clip(np.digitize(prob, edges[1:-1]), 0, bins - 1)
+    err = 0.0
+    for b in range(bins):
+        sel = idx == b
+        if sel.any():
+            err += sel.mean() * abs(prob[sel].mean() - y[sel].mean())
+    return float(err)
+
+
+def reliability(prob, y, bins=10):
+    edges = np.linspace(0, 1, bins + 1)
+    idx = np.clip(np.digitize(prob, edges[1:-1]), 0, bins - 1)
+    return [{"bin": f"{edges[b]:.1f}-{edges[b + 1]:.1f}", "n": int((idx == b).sum()),
+             "mean_p": float(prob[idx == b].mean()) if (idx == b).any() else None,
+             "freq": float(y[idx == b].mean()) if (idx == b).any() else None}
+            for b in range(bins)]
+
+
+def metrics(encs, outs, temperature=1.0, threshold=0.5):
+    """All metrics at probability threshold `threshold` on sigmoid(z / T)."""
+    thr_logit = temperature * float(np.log(threshold / (1 - threshold)))
+    res = f1(*f1_counts(encs, outs, thr_logit))
+    zs = np.concatenate([o["z"][o["valid"]] for o in outs]) / temperature
+    ys = np.concatenate([o["y"][o["valid"]] for o in outs])
+    row_nll = [F.binary_cross_entropy_with_logits(
+        torch.from_numpy(o["z"][o["valid"]] / temperature),
+        torch.from_numpy(o["y"][o["valid"]])).item() for o in outs if o["valid"].any()]
+    prob = 1 / (1 + np.exp(-zs))
+    pred = prob >= threshold
+    gold = sum(len(e["gold_spans"]) for e in encs)
+    res.update({
+        "nll_row_mean": float(np.mean(row_nll)),
+        "nll_decision": float(F.binary_cross_entropy_with_logits(
+            torch.from_numpy(zs), torch.from_numpy(ys)).item()),
+        "brier": float(np.mean((prob - ys) ** 2)),
+        "ece_all": ece(prob, ys),
+        "ece_predicted": ece(prob[pred], ys[pred]),
+        "n_decisions": int(len(ys)), "n_predicted": int(pred.sum()),
+        "positive_rate": float(ys.mean()),
+        "candidate_recall": 1 - sum(e["unrepresented"] for e in encs) / max(gold, 1),
+        "temperature": temperature, "threshold": threshold,
+    })
+    return res

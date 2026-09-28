@@ -24,4 +24,5 @@ print("downloaded", sha)
 PY
 fi
 cat $DEST/REVISION
-python -m pytest -q tests 2>&1 | tail -4
+python -m pytest -q tests/test_bidirectional.py --tb=short 2>&1 | grep -E "^E |passed|failed" | cut -c1-300 | head -20
+python -m pytest -q tests 2>&1 | tail -2

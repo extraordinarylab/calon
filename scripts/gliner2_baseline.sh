@@ -15,7 +15,10 @@ cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_DISABLE_XET=1 HF_HOME=/scratch/u6sn/yangw.u6sn/hf_cache
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 OUT=$ROOT/runs2/gliner2; mkdir -p $OUT
-for M in fastino/gliner2-base-v1 fastino/gliner2-large-v1 fastino/gliner2.5-base-v1; do
+# gliner2.5 tokenizers need protobuf and sentencepiece
+python -c "import google.protobuf, sentencepiece" 2>/dev/null || \
+  $CONDA/bin/uv pip install --python $CONDA/envs/gliner2/bin/python -q protobuf sentencepiece
+for M in ${MODELS:-fastino/gliner2-base-v1 fastino/gliner2-large-v1 fastino/gliner2.5-base-v1}; do
   for V in desc name_only; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
     N=$(basename $M)-$V

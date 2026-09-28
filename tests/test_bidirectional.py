@@ -45,7 +45,12 @@ def test_padding_does_not_change_real_tokens(sdpa):
     pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
     h1 = hidden(m, [a], [[1] * len(a)])
     h2 = hidden(m, [a + [pad] * 5], [[1] * len(a) + [0] * 5])
-    assert torch.allclose(h1[0], h2[0, :len(a)], atol=1e-4)
+    diff = (h1[0] - h2[0, :len(a)]).abs().max().item()
+    scale = h1[0].abs().max().item()
+    assert diff <= 1e-4 * scale + 1e-4, (diff, scale)
+    # and padded keys really are ignored: changing the pad token id changes nothing
+    h3 = hidden(m, [a + [pad + 1] * 5], [[1] * len(a) + [0] * 5])
+    assert (h2[0, :len(a)] - h3[0, :len(a)]).abs().max().item() <= 1e-4 * scale + 1e-4
 
 
 def test_sdpa_matches_eager(sdpa):

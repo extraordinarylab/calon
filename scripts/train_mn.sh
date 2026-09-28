@@ -13,7 +13,8 @@
 # only; RLCD runs are evaluated with both decoding rules (<NAME>/ and <NAME>-ent/).
 # Environment: SEED, EXP, ENCODER, HEAD, MIXSPEC, DDROP; optional UPDATES,
 # BRIER (RLCD Brier weight, default 1), FINE (1 = Few-NERD fine types only,
-# default 1), NAME (run directory name).
+# default 1), NAME (run directory name), NONEW (none-span weight), DATA_DIR,
+# TRAIN_EXTRA (extra train.py flags, e.g. "--label_pool marker --lowercase_aug 0.3").
 set -euo pipefail
 export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p $TMPDIR
 source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
@@ -36,7 +37,7 @@ srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir
   --rdzv_endpoint=$MASTER:29500 -m ierlcd.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
   --encoder $ENCODER --head $HEAD $FF --brier_weight $BRIER --none_weight $NONEW --desc_dropout $DDROP --mode bce \
   --batch 128 --micro 8 --updates $UPDATES --enc_lr 4e-5 --head_lr 2e-4 --eval_every 500 \
-  --workers 12 --seed $SEED" > $RUNS/$NAME.log 2>&1 || {
+  --workers 12 --seed $SEED ${TRAIN_EXTRA:-}" > $RUNS/$NAME.log 2>&1 || {
   # a rendezvous error while ranks shut down must not skip evaluation of a saved model
   grep -q "^done " $RUNS/$NAME.log && [ -s $RUNS/$NAME/final.pt ] || exit 1
   echo "srun exited non-zero after training finished; continuing"; }

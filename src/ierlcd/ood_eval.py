@@ -17,7 +17,7 @@ from transformers import AutoTokenizer
 
 from .collator import Collator, add_control_tokens, encode_row, load_rows
 from .evaluate import decode, f1, metrics, predict, with_temperature
-from .model import SpanLabelModel
+from .model import load_model
 
 
 def per_query(encs, outs, T, threshold):
@@ -108,8 +108,7 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
     collate = Collator(tok, lab_id, txt_id)
-    model = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).cuda()
-    model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
+    model = load_model(args.encoder, len(tok), args.W, args.head, args.ckpt)
 
     res = {"ckpt": args.ckpt, "settings": settings, "name_only": args.name_only, "sets": {}}
     for name, info in manifest["sets"].items():

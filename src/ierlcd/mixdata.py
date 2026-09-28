@@ -50,11 +50,13 @@ def step_schedule(sizes, mix, updates, batch, seed):
 class StepDataset(torch.utils.data.Dataset):
     """Step k yields this rank's contiguous slice of the global batch."""
 
-    def __init__(self, rows, steps, tokenizer, collate, W, micro, rank=0, world=1, desc_dropout=0.0):
+    def __init__(self, rows, steps, tokenizer, collate, W, micro, rank=0, world=1, desc_dropout=0.0,
+                 lowercase_aug=0.0, anon_labels=0.0):
         self.rows, self.steps, self.tok = rows, steps, tokenizer
         self.collate, self.W, self.micro = collate, W, micro
         self.rank, self.world = rank, world
         self.desc_dropout = desc_dropout
+        self.lowercase_aug, self.anon_labels = lowercase_aug, anon_labels
 
     def __len__(self):
         return len(self.steps)
@@ -71,6 +73,14 @@ class StepDataset(torch.utils.data.Dataset):
                 # (copies: query dicts are shared between rows)
                 row["queries"] = [dict(q, description="") if q["description"] and
                                   rng.random() < self.desc_dropout else q for q in row["queries"]]
+            if self.anon_labels:
+                row = anonymize_labels(row, rng, self.anon_labels)
+                stats["aug/anon_rows"] += any(q["label"].startswith("entity ") for q in row["queries"])
+            if self.lowercase_aug and rng.random() < self.lowercase_aug:
+                low = row["text"].lower()
+                if len(low) == len(row["text"]):            # offsets stay valid
+                    row["text"] = low
+                    stats["aug/lowercase_rows"] += 1
             for q in row["queries"]:
                 stats[f"{src}/{q['status']}"] += 1
                 stats[f"desc/{'with' if q['description'] else 'name_only'}"] += 1
@@ -80,6 +90,20 @@ class StepDataset(torch.utils.data.Dataset):
         encs.sort(key=lambda e: len(e["cands"]) * max(1, len(e["labels"])))
         micro = [self.collate(encs[i:i + self.micro]) for i in range(0, len(encs), self.micro)]
         return micro, dict(stats)
+
+
+def anonymize_labels(row, rng, p):
+    """GLiNER2-style augmentation: a described label is, with probability p, renamed
+    'entity k' (k random, unique in the row), so only its description identifies it."""
+    names = {q["label"] for q in row["queries"] if q["description"] and rng.random() < p}
+    if not names:
+        return row
+    ks = rng.sample(range(1, 100), len(names))
+    new = {n: f"entity {k}" for n, k in zip(sorted(names), ks)}
+    row = dict(row)
+    row["queries"] = [dict(q, label=new[q["label"]]) if q["label"] in new else q for q in row["queries"]]
+    row["entities"] = [dict(e, label=new[e["label"]]) if e["label"] in new else e for e in row["entities"]]
+    return row
 
 
 def fewnerd_coarse_names(data):

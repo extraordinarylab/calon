@@ -104,6 +104,13 @@ def main():
     ap.add_argument("--eval_limit", type=int, default=1000, help="dev_select rows per source")
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--label_pool", default="mean", choices=["mean", "marker", "both"])
+    ap.add_argument("--head_hidden", type=int, default=512)
+    ap.add_argument("--head_out", type=int, default=256)
+    ap.add_argument("--lowercase_aug", type=float, default=0.0,
+                    help="share of training rows shown fully lowercased (MIT-style text)")
+    ap.add_argument("--anon_labels", type=float, default=0.0,
+                    help="share of described labels renamed 'entity k' (GLiNER2-style)")
     args = ap.parse_args()
     # DDP under torchrun: each rank takes batch/world rows of every global step; the
     # loss keeps SPEC's reduction (mean over the step's active rows across all ranks).
@@ -119,6 +126,8 @@ def main():
     if main_rank:
         out.mkdir(parents=True, exist_ok=True)
         (out / "args.json").write_text(json.dumps({**vars(args), "world_size": world}, indent=2))
+        (out / "model_config.json").write_text(json.dumps(
+            {"hidden": args.head_hidden, "out": args.head_out, "label_pool": args.label_pool}))
 
     random.seed(args.seed)
     torch.manual_seed(args.seed + rank)
@@ -143,11 +152,13 @@ def main():
     steps = step_schedule({s: len(r) for s, r in rows.items()}, mix, args.updates, args.batch,
                           args.seed)
     loader = torch.utils.data.DataLoader(
-        StepDataset(rows, steps, tok, collate, args.W, args.micro, rank, world, args.desc_dropout),
+        StepDataset(rows, steps, tok, collate, args.W, args.micro, rank, world, args.desc_dropout,
+                    args.lowercase_aug, args.anon_labels),
         batch_size=None,
         shuffle=False, num_workers=args.workers, prefetch_factor=4, persistent_workers=False)
 
-    base = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).to(device)
+    base = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head, hidden=args.head_hidden,
+                          out=args.head_out, label_pool=args.label_pool).to(device)
     if args.init:
         base.load_state_dict(torch.load(args.init, map_location=device))
     model = DDP(base, device_ids=[local]) if world > 1 else base

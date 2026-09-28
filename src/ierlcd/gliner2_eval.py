@@ -58,6 +58,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--name_only", action="store_true")
     ap.add_argument("--backend", default="gliner2", choices=["gliner2", "gliformer"])
+    ap.add_argument("--sets", nargs="*", help="only these evaluation sets (default: all)")
     args = ap.parse_args()
     if args.backend == "gliformer":
         import torch
@@ -98,8 +99,11 @@ def main():
     manifest = json.loads((Path(args.ood) / "manifest.json").read_text())
     res = {"model": args.model, "name_only": args.name_only, "sets": {}}
     for name in manifest["sets"]:
+        if args.sets and name not in args.sets:
+            continue
         rows = read_jsonl(Path(args.ood) / f"{name}.jsonl")
         tp = fp = fn = absent_q = absent_fp = present_q = present_miss = 0
+        per = {}
         for r in rows:
             labels = ([q["label"] for q in r["queries"]] if args.name_only else
                       {q["label"]: q["description"] or q["label"] for q in r["queries"]})
@@ -108,6 +112,9 @@ def main():
             tp += len(pred & gold)
             fp += len(pred - gold)
             fn += len(gold - pred)
+            for k, part in ((0, pred & gold), (1, pred - gold), (2, gold - pred)):
+                for s in part:
+                    per.setdefault(s[2], [0, 0, 0])[k] += 1
             for q in r["queries"]:
                 predicted = any(p[2] == q["label"] for p in pred)
                 if not any(g[2] == q["label"] for g in gold):
@@ -120,8 +127,9 @@ def main():
         m["absent_query_fpr"] = absent_fp / absent_q if absent_q else float("nan")
         m["present_query_fnr"] = present_miss / present_q if present_q else float("nan")
         m["entity_miss_rate"] = fn / (tp + fn) if tp + fn else float("nan")
+        m["per_label"] = {lab: f1(*c) for lab, c in per.items()}
         res["sets"][name] = m
-        print(name, {k: round(v, 4) for k, v in m.items()}, flush=True)
+        print(name, {k: round(v, 4) for k, v in m.items() if k != "per_label"}, flush=True)
     sets = res["sets"]
     cn = [v["f1"] for k, v in sets.items() if k.startswith("crossner")]
     res["macro_f1_crossner"] = sum(cn) / len(cn) if cn else float("nan")

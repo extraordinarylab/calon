@@ -15,7 +15,7 @@ from transformers import AutoTokenizer
 from .collator import Collator, add_control_tokens
 from .evaluate import f1, f1_counts, metrics, predict, reliability, rlcd_brier, with_temperature
 from .mixdata import fewnerd_transform
-from .model import SpanLabelModel
+from .model import load_model
 from .train import encode_split
 
 
@@ -57,8 +57,7 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
     collate = Collator(tok, lab_id, txt_id)
-    model = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head).cuda()
-    model.load_state_dict(torch.load(args.ckpt, map_location="cuda"))
+    model = load_model(args.encoder, len(tok), args.W, args.head, args.ckpt)
     sources = args.sources.split(",")
     rlcd = args.head == "rlcd"
     if args.fewnerd_fine_only:

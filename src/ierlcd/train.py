@@ -67,6 +67,7 @@ def main():
     ap.add_argument("--sigma", type=float, default=0.2)
     ap.add_argument("--lam", type=float, default=0.1)
     ap.add_argument("--lam_ramp", type=int, default=200)
+    ap.add_argument("--alpha", type=float, default=0.0, help="spherical-score weight (appendix A)")
     ap.add_argument("--enc_lr", type=float, default=2e-5)
     ap.add_argument("--head_lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.01)
@@ -145,7 +146,7 @@ def main():
                 stats = {}
                 loss = loss_fn(z, tgt["y"].to(device), tgt["valid"].to(device), mode=args.mode,
                                K=args.K, sigma=args.sigma, lam=lam, generator=noise_gen,
-                               stats=stats)
+                               stats=stats, alpha=args.alpha)
                 # DDP averages gradients over ranks, hence the factor `world`
                 (loss * n_act * world / n_total).backward()
             for k, v in stats.items():

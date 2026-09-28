@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 
 ARMS = ["warmup", "bce-s0.2", "bce_scaled-s0.2", "direct-s0.2", "pg-s0.2", "direct-s1.0",
-        "pg-s1.0", "direct-s2.0", "pg-s2.0"]
+        "pg-s1.0", "direct-s2.0", "pg-s2.0",
+        "direct-s0.2-sph", "pg-s0.2-sph", "direct-s1.0-sph", "pg-s1.0-sph", "direct-s2.0-sph",
+        "pg-s2.0-sph"]
 OOD = ["crossner_ai", "crossner_literature", "crossner_music", "crossner_politics",
        "crossner_science", "mit_movie", "mit_restaurant"]
 KEY = "calibrated@fw_tuned"

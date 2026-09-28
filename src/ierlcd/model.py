@@ -34,7 +34,8 @@ class SpanLabelModel(nn.Module):
                  dropout=0.1, attn_implementation=None):
         super().__init__()
         kw = {"attn_implementation": attn_implementation} if attn_implementation else {}
-        self.encoder = AutoModel.from_pretrained(encoder_name, **kw)
+        # fp32 master weights (Qwen's config says bf16); compute runs under bf16 autocast
+        self.encoder = AutoModel.from_pretrained(encoder_name, dtype=torch.float32, **kw)
         if vocab_size > self.encoder.get_input_embeddings().num_embeddings:
             self.encoder.resize_token_embeddings(vocab_size)
         self.bidirectional_decoder = self.encoder.config.model_type in DECODER_TYPES

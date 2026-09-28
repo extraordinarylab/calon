@@ -26,9 +26,20 @@ step tests;      python -m pytest -q tests 2>&1 | tail -3
 step inventory;  python -m ierlcd.prepare_mix --stage inventory --out $MIX
 
 if [ ! -s $BANK ]; then
+  # Existing vLLM envs do not work here: lco-embed/world carry a flash_attn built for
+  # torch 2.9 under torch 2.11; drivelology-judge's vllm wheel targets CUDA 13, newer
+  # than the node driver. Build a clean one with the cu129 aarch64 wheel.
+  if [ ! -x $CONDA/envs/ie-rlcd-vllm/bin/python ]; then
+    step build_vllm_env
+    conda create -y -q -n ie-rlcd-vllm python=3.12 > /dev/null
+    conda activate ie-rlcd-vllm
+    pip install -q --no-cache-dir torch==2.11.0 --index-url https://download.pytorch.org/whl/cu129
+    pip install -q --no-cache-dir \
+      "https://github.com/vllm-project/vllm/releases/download/v0.26.0/vllm-0.26.0%2Bcu129-cp38-abi3-manylinux_2_28_aarch64.whl"
+    pip freeze > logs/env-vllm-freeze.txt
+  fi
   step label_bank
-  # lco-embed/world carry a flash_attn built for another torch ABI; this env has none
-  conda activate drivelology-judge
+  conda activate ie-rlcd-vllm
   python -m ierlcd.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $ROOT/label_bank.log 2>&1 || { tail -20 $ROOT/label_bank.log; exit 1; }
   tail -8 $ROOT/label_bank.log

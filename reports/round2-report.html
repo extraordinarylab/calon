@@ -1,0 +1,193 @@
+<title>IE-RLCD 第二輪結果</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --ink: #1b2230; --muted: #5a6475; --line: #dde1e8;
+  --accent: #2c55c7; --rlcd: #1f7a4d; --ref: #7a4fb8; --amber: #a86a12; --amber-soft: #f6ead6; --grid: #e6e9ef;
+  --serif: "Noto Serif TC", "Songti TC", serif;
+  --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441;
+    --accent: #7fa0ff; --rlcd: #5fcf95; --ref: #c29bff; --amber: #e2a54c; --amber-soft: #3a2c16; --grid: #252d39;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11151c; --surface: #19202a; --ink: #e5e9f0; --muted: #9aa3b3; --line: #2b3441;
+  --accent: #7fa0ff; --rlcd: #5fcf95; --ref: #c29bff; --amber: #e2a54c; --amber-soft: #3a2c16; --grid: #252d39;
+}
+body { background: var(--bg); color: var(--ink); font: 16px/1.75 var(--sans); padding-block: 40px 64px; padding-inline: 18px; }
+.wrap { max-width: 900px; margin: 0 auto; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 34px/1.25 var(--serif); margin: 0; text-wrap: balance; }
+h2 { font: 700 23px/1.35 var(--serif); margin: 0 0 6px; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+.lede { font-size: 18px; }
+.muted { color: var(--muted); }
+section { display: grid; gap: 14px; }
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
+.finding b { font: 500 24px/1.1 var(--mono); color: var(--accent); }
+.finding.ref b { color: var(--ref); } .finding.am b { color: var(--amber); } .finding.r b { color: var(--rlcd); }
+.finding span { font-size: 15px; }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px 8px; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 580px; height: auto; }
+.chart text { fill: var(--muted); font: 12px var(--sans); }
+.chart .val { fill: var(--ink); font: 500 12px var(--mono); }
+.chart .lab { fill: var(--ink); font: 13px var(--sans); }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--muted); padding: 0 8px 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 500; color: var(--muted); font-size: 13px; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--sans); }
+tbody tr:last-child td { border-bottom: 0; }
+tr.ref td { color: var(--ref); } tr.seeded td { color: var(--amber); }
+.best { font-weight: 500; color: var(--accent); }
+.box { background: var(--amber-soft); border-radius: 10px; padding: 14px 18px; display: grid; gap: 10px; }
+ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 72ch; }
+.note { font-size: 14px; color: var(--muted); }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 520px) { h1 { font-size: 27px; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">英文命名實體抽取 · 2026-09-28 · 第二輪 · 48 個模型 × 3 個種子平均</div>
+  <h1>離 GLiNER2 還差一步，有範例就超越</h1>
+  <p class="lede">這一輪加入約 26 萬筆由 Qwen3.8 生成或標註的多樣化資料，改用雙向 Qwen3-0.6B，並在訓練時隨機拿掉類別說明。zero-shot 最好到 0.522，仍輸給 GLiNER2-large 的 0.597；加入仿照目標領域寫的資料後到 0.678。</p>
+</header>
+
+<section class="findings" aria-label="四個結論">
+  <div class="finding ref"><b>0.597</b><span>GLiNER2-large 在我們七個測試集上的平均 F1（我們自己跑，同樣計分）。</span></div>
+  <div class="finding"><b>0.522</b><span>我們 zero-shot 最好：Qwen3 ＋ BCE ＋ 隨機拿掉 30% 說明。第一輪最好是 0.488。</span></div>
+  <div class="finding am"><b>0.678</b><span>同一設定再加入仿照 CrossNER/MIT 訓練集寫的資料（不算 zero-shot）。</span></div>
+  <div class="finding r"><b>3–4%</b><span>RLCD 的亂抓率（BCE 是 8–17%），但 Qwen3 上 F1 比 BCE 低。</span></div>
+</section>
+
+<section>
+  <h2>和 GLiNER2 比較</h2>
+  <p class="muted">沒看過的七個領域（CrossNER 五個領域與 MIT 電影、餐廳）的平均 F1。我們的模型是 3 個種子的平均，細線為 ±1 標準差。紫色是 GLiNER2，琥珀色用了目標領域的例句生成資料。</p>
+  <div class="chart"><svg id="bars" viewBox="0 0 780 330" role="img" aria-label="各模型沒看過領域平均 F1"></svg>
+    <div class="legend"><span><i style="background:var(--ref)"></i>GLiNER2（官方模型）</span><span><i style="background:var(--accent)"></i>我們，zero-shot，BCE</span><span><i style="background:var(--rlcd)"></i>我們，zero-shot，RLCD</span><span><i style="background:var(--amber)"></i>我們，加目標領域風格資料</span></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>模型</th><th>平均</th><th>AI</th><th>文學</th><th>音樂</th><th>政治</th><th>科學</th><th>MIT 電影</th><th>MIT 餐廳</th><th>亂抓率</th></tr></thead>
+    <tbody>
+      <tr class="ref"><td>GLiNER2-large</td><td>0.597</td><td>0.561</td><td>0.625</td><td>0.677</td><td>0.652</td><td>0.605</td><td>0.506</td><td>0.553</td><td>11%</td></tr>
+      <tr class="ref"><td>GLiNER2-base</td><td>0.581</td><td>0.576</td><td>0.567</td><td>0.647</td><td>0.638</td><td>0.591</td><td>0.481</td><td>0.569</td><td>14%</td></tr>
+      <tr><td>Qwen3 BCE ＋拿掉 30% 說明</td><td class="best">0.522</td><td>0.552</td><td>0.556</td><td>0.538</td><td>0.618</td><td>0.578</td><td>0.423</td><td>0.391</td><td>14%</td></tr>
+      <tr><td>Qwen3 RLCD ＋拿掉 30% 說明</td><td>0.478</td><td>0.525</td><td>0.463</td><td>0.374</td><td>0.597</td><td>0.475</td><td class="best">0.489</td><td class="best">0.426</td><td class="best">4%</td></tr>
+      <tr class="seeded"><td>Qwen3 BCE ＋拿掉 30%（加目標領域風格資料）</td><td>0.678</td><td>0.695</td><td>0.671</td><td>0.679</td><td>0.738</td><td>0.666</td><td>0.624</td><td>0.670</td><td>8%</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="note">
+    <li>zero-shot 和 GLiNER2-large 的差距主要在音樂、文學和 MIT；AI 和政治已經很接近。</li>
+    <li>GLiNER2 的訓練資料含 1.8 萬篇 Wikipedia，而 CrossNER 也來自 Wikipedia，無法確認是否重疊；MIT 沒有這個問題，GLiNER2 在那裡也領先。</li>
+    <li>琥珀色那一列用了 CrossNER/MIT 訓練集的例句和類別說明來生成訓練資料，不能當 zero-shot 結果和 GLiNER2 直接比較。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>隨機拿掉類別說明是有效的正則化</h2>
+  <p class="muted">訓練時每個類別有 30% 機率只給名稱。測試時分別給「名稱＋說明」和「只有名稱」。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>設定</th><th>有說明：0% → 30%</th><th>只給名稱：0% → 30%</th></tr></thead>
+    <tbody>
+      <tr><td>Qwen3 BCE，zero-shot</td><td>0.507 → <b>0.522</b></td><td>0.452 → <b>0.487</b></td></tr>
+      <tr><td>Qwen3 BCE，加目標領域風格資料</td><td>0.662 → <b>0.678</b></td><td>0.578 → <b>0.639</b></td></tr>
+      <tr><td>Qwen3 RLCD，zero-shot</td><td>0.467 → <b>0.478</b></td><td>0.392 → <b>0.401</b></td></tr>
+      <tr><td>Qwen3 RLCD，加目標領域風格資料</td><td>0.645 → 0.640</td><td>0.484 → <b>0.573</b></td></tr>
+      <tr><td>ModernBERT RLCD，加目標領域風格資料</td><td>0.644 → 0.632</td><td>0.422 → <b>0.520</b></td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">只給名稱時幾乎一定大幅變好；有說明時多數略好或持平。模型不再過度依賴說明。</p>
+</section>
+
+<section>
+  <h2>這一輪用了哪些資料</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>資料</th><th>訓練列數</th><th>做法</th></tr></thead>
+    <tbody>
+      <tr><td>合成文字（仿 GLiNER2）</td><td>95,700</td><td style="white-space:normal;text-align:left;font-family:var(--sans)">22 種文體 × 60 個領域；每篇附上自己的類別、說明（含容易混淆的相近類別）、標註和「本文沒有」的類別</td></tr>
+      <tr><td>真實文字標註</td><td>90,100</td><td style="white-space:normal;text-align:left;font-family:var(--sans)">新聞、法律判決、PubMed、arXiv（不含 Wikipedia）；第二輪用相近類別確認「不存在」</td></tr>
+      <tr><td>FiNERWeb／Pile 補負例</td><td>16,968／73,870</td><td style="white-space:normal;text-align:left;font-family:var(--sans)">每句請 Qwen 確認 8 個類別，一半是相近類別；補了 16 萬個「不存在」</td></tr>
+      <tr class="seeded"><td>目標領域風格資料（非 zero-shot）</td><td>78,900</td><td style="white-space:normal;text-align:left;font-family:var(--sans)">每次 5 句 CrossNER/MIT 訓練集例句，請 Qwen 針對不同子主題寫新的</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">訓練：每個模型 4 台機器 16 張卡，每步 128 筆、3,000 步；Qwen3 每個模型約 15 分鐘（第一輪約 35–50 分鐘）。文字長度上限提高到 1,024 個 token。</p>
+</section>
+
+<section>
+  <h2>限制</h2>
+  <ul class="note">
+    <li>ModernBERT ＋ BCE 在這輪的大批次設定下沒練好（0.377，第一輪類似設定是 0.445），需要另外調學習率和步數。</li>
+    <li>資料比例是我訂的起始值，沒有調過；門檻只用訓練來源的驗證資料決定，GLiNER2 用它的預設門檻。</li>
+    <li>RLCD 在音樂領域特別差（0.37 對 BCE 的 0.54），原因還沒分析。</li>
+    <li>一個模型訓練完後因機器間斷線被記為失敗，已補跑它的評估，模型沒有重訓。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>建議的下一步</h2>
+  <ul>
+    <li>zero-shot 要追上 GLiNER2：多生成音樂、文學、口語查詢方向的合成文字，但不看目標領域例句。</li>
+    <li>主設定改用 Qwen3 ＋ BCE ＋ 拿掉 30% 說明；需要「寧可少抓、不能亂抓」時用 RLCD。</li>
+    <li>分析 RLCD 在音樂領域的錯誤，並多跑幾個種子。</li>
+  </ul>
+</section>
+
+<footer>生成與標註：Qwen3.8-27B（vLLM，最多 108 張 GH200 同時執行）。GLiNER2 基準：fastino/gliner2-base-v1、gliner2-large-v1、gliner2.5-base-v1（gliner2 2.0.0）。完整報告在 ie-rlcd repo 的 reports/2026-09-28-round2-experiments.md。</footer>
+</div>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) {
+      var v = attrs[k];
+      if (typeof v === "string" && v.indexOf("var(") === 0) e.style.setProperty(k, v);
+      else e.setAttribute(k, v);
+    }
+    if (text != null) e.textContent = text;
+    parent.appendChild(e); return e;
+  }
+  var rows = [
+    ["GLiNER2-large", 0.597, 0, "var(--ref)"],
+    ["GLiNER2-base", 0.581, 0, "var(--ref)"],
+    ["GLiNER2.5-base", 0.562, 0, "var(--ref)"],
+    ["Qwen3 BCE ＋拿掉 30%", 0.522, 0.010, "var(--accent)"],
+    ["Qwen3 BCE", 0.507, 0.001, "var(--accent)"],
+    ["Qwen3 RLCD ＋拿掉 30%", 0.478, 0.014, "var(--rlcd)"],
+    ["ModernBERT RLCD ＋拿掉 30%", 0.444, 0.017, "var(--rlcd)"],
+    ["Qwen3 BCE ＋拿掉 30%（種子資料）", 0.678, 0.004, "var(--amber)"]
+  ];
+  var svg = document.getElementById("bars");
+  var L = 230, R = 720, top = 12, rowH = 36, max = 0.8;
+  function x(v) { return L + (R - L) * v / max; }
+  var H = top + rowH * rows.length;
+  [0, 0.2, 0.4, 0.6, 0.8].forEach(function (t) {
+    el("line", { x1: x(t), x2: x(t), y1: top, y2: H, stroke: "var(--grid)", "stroke-width": 1 }, svg);
+    el("text", { x: x(t), y: H + 16, "text-anchor": "middle" }, svg, t.toFixed(1));
+  });
+  rows.forEach(function (b, i) {
+    var y = top + i * rowH + 7, h = 20;
+    el("text", { x: L - 10, y: y + 15, "text-anchor": "end", class: "lab" }, svg, b[0]);
+    el("rect", { x: L, y: y, width: x(b[1]) - L, height: h, rx: 3, fill: b[3] }, svg);
+    if (b[2] > 0) el("line", { x1: x(b[1] - b[2]), x2: x(b[1] + b[2]), y1: y + h / 2, y2: y + h / 2, stroke: "var(--ink)", "stroke-width": 1.5 }, svg);
+    el("text", { x: x(b[1] + b[2]) + 8, y: y + 15, class: "val" }, svg, b[1].toFixed(3));
+  });
+  el("text", { x: (L + R) / 2, y: H + 34, "text-anchor": "middle" }, svg, "沒看過的領域平均 F1");
+})();
+</script>

@@ -33,13 +33,20 @@ if [ ! -s $BANK ]; then
     step build_vllm_env
     conda create -y -q -n ie-rlcd-vllm python=3.12 > /dev/null
     conda activate ie-rlcd-vllm
-    pip install -q --no-cache-dir torch==2.11.0 --index-url https://download.pytorch.org/whl/cu129
+    pip install -q --no-cache-dir torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
+      --index-url https://download.pytorch.org/whl/cu129
     pip install -q --no-cache-dir \
       "https://github.com/vllm-project/vllm/releases/download/v0.26.0/vllm-0.26.0%2Bcu129-cp38-abi3-manylinux_2_28_aarch64.whl"
-    pip freeze > logs/env-vllm-freeze.txt
   fi
-  step label_bank
   conda activate ie-rlcd-vllm
+  # PyPI torchvision/torchaudio (pulled in by vllm) do not match torch cu129
+  if ! ls -d $CONDA/envs/ie-rlcd-vllm/lib/python3.12/site-packages/torchvision-*+cu129.dist-info >/dev/null 2>&1; then
+    step fix_torchvision
+    pip install -q --no-cache-dir --no-deps --force-reinstall torchvision==0.26.0 torchaudio==2.11.0 \
+      --index-url https://download.pytorch.org/whl/cu129
+  fi
+  pip freeze > logs/env-vllm-freeze.txt
+  step label_bank
   python -m ierlcd.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $ROOT/label_bank.log 2>&1 || { tail -20 $ROOT/label_bank.log; exit 1; }
   tail -8 $ROOT/label_bank.log

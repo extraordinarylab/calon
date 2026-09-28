@@ -46,11 +46,58 @@ def errors(runs, arm):
     return out
 
 
+def arm_metrics(runs, arm):
+    c = load(Path(runs) / arm / "calibration.json")
+    o = load(Path(runs) / arm / "ood.json")
+    if c is None or o is None:
+        return None
+    if isinstance(c.get("test"), dict) and "raw@0.5" in c["test"]:   # FiNERWeb-only format
+        in_f1 = c["test"]["calibrated@tuned"]["f1"]
+        in_nll = c["test"]["calibrated@tuned"]["nll_decision"]
+    else:
+        in_f1 = c["test_macro_f1[calibrated@tuned]"]
+        in_nll = sum(v["calibrated@tuned"]["nll_decision"] for v in c["test"].values()) / len(c["test"])
+    fpr = [o["sets"][s][KEY]["absent_query_fpr"] for s in OOD]
+    ece = [o["sets"][s][KEY]["ece_predicted"] for s in OOD]
+    return {"in_f1": in_f1, "in_nll": in_nll, "ood_cn": o[f"macro_f1_crossner[{KEY}]"],
+            "ood_all": o[f"macro_f1_all[{KEY}]"], "mit_movie": o["sets"]["mit_movie"][KEY]["f1"],
+            "mit_rest": o["sets"]["mit_restaurant"][KEY]["f1"],
+            "ood_fpr": sum(fpr) / len(fpr), "ood_ece_pred": sum(ece) / len(ece)}
+
+
+def seeds_table(seed_dirs, baseline):
+    import statistics
+    cols = ["in_f1", "in_nll", "ood_cn", "ood_all", "mit_movie", "mit_rest", "ood_fpr", "ood_ece_pred"]
+    print(f"== mean ± std over seeds {[Path(d).name for d in seed_dirs]} "
+          "(in_* = in-domain test macro over sources; ood_* = zero-shot, T/thr from own dev_calib)")
+    print(f"{'arm':16s} n " + " ".join(f"{c:>15s}" for c in cols))
+    for a in ARMS:
+        ms = [m for d in seed_dirs if (m := arm_metrics(d, a))]
+        if not ms:
+            continue
+        cells = []
+        for c in cols:
+            xs = [m[c] for m in ms]
+            sd = statistics.stdev(xs) if len(xs) > 1 else 0.0
+            cells.append(f"{statistics.mean(xs):.4f}±{sd:.4f}")
+        print(f"{a:16s} {len(ms)} " + " ".join(f"{x:>15s}" for x in cells))
+    if baseline:
+        print("-- FiNERWeb-only baseline (seed 42; in_* is FiNERWeb test only)")
+        for a in ARMS:
+            m = arm_metrics(baseline, a)
+            if m:
+                print(f"{a:16s} 1 " + " ".join(f"{m[c]:15.4f}" for c in cols))
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", required=True)
+    ap.add_argument("--runs")
+    ap.add_argument("--seeds", nargs="+")
     ap.add_argument("--baseline")
     args = ap.parse_args()
+    if args.seeds:
+        seeds_table(args.seeds, args.baseline)
+        return
     print(f"== in-domain test F1 (calibrated@tuned on pooled dev_calib), {args.runs}")
     for a in ARMS:
         c = load(Path(args.runs) / a / "calibration.json")

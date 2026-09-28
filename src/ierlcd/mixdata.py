@@ -47,16 +47,20 @@ def step_schedule(sizes, mix, updates, batch, seed):
 
 
 class StepDataset(torch.utils.data.Dataset):
-    def __init__(self, rows, steps, tokenizer, collate, W, micro):
+    """Step k yields this rank's contiguous slice of the global batch."""
+
+    def __init__(self, rows, steps, tokenizer, collate, W, micro, rank=0, world=1):
         self.rows, self.steps, self.tok = rows, steps, tokenizer
         self.collate, self.W, self.micro = collate, W, micro
+        self.rank, self.world = rank, world
 
     def __len__(self):
         return len(self.steps)
 
     def __getitem__(self, k):
         encs, stats = [], collections.Counter()
-        for src, idx, qseed in self.steps[k]:
+        per = len(self.steps[k]) // self.world
+        for src, idx, qseed in self.steps[k][self.rank * per:(self.rank + 1) * per]:
             row = dict(self.rows[src][idx])
             row["queries"] = sample_queries(row["queries"], random.Random(qseed))
             for q in row["queries"]:

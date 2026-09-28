@@ -24,7 +24,18 @@ def main():
     ap.add_argument("--arms", default="bce-dd0.3,rlcd-dd0.3")
     ap.add_argument("--seeds", default="42,43,44")
     ap.add_argument("--ood", default="/scratch/u6sn/yangw.u6sn/ie-rlcd/data/ood")
+    ap.add_argument("--labels", help="set:label,... -> print per-label F1 of every arm, then exit")
     args = ap.parse_args()
+    if args.labels:
+        arms, seeds = args.arms.split(","), args.seeds.split(",")
+        res = {a: [json.loads((Path(args.runs) / f"{args.exp}-s{s}" / a / "ood-desc.json").read_text())
+                   for s in seeds] for a in arms}
+        print("set:label " + " ".join(arms))
+        for item in args.labels.split(","):
+            name, lab = item.split(":")
+            f = [mean([r["sets"][name][KEY]["per_label"][lab]["f1"] for r in res[a]]) for a in arms]
+            print(f"{name}:{lab} " + " ".join(f"{x:.3f}" for x in f))
+        return
     arms, seeds = args.arms.split(","), args.seeds.split(",")
     res = {a: [json.loads((Path(args.runs) / f"{args.exp}-s{s}" / a / "ood-desc.json").read_text())
                for s in seeds] for a in arms}

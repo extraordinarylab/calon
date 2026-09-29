@@ -5,8 +5,8 @@
 #SBATCH --time=8:00:00
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=64
-# Decoder-LLM NER baselines trained only on Pile-NER data (GNER-LLaMA-7B and
-# SLIMER-LLaMA3): download once, one GPU per model, every OOD set
+# Decoder-LLM NER baselines trained only on Pile-NER data (GNER-LLaMA-7B):
+# download once, then every OOD set
 # and the PII set. Results: runs2/llm-ner/<model>/<set>.json.
 set -euo pipefail
 export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p $TMPDIR
@@ -18,8 +18,9 @@ python -m pytest -q tests/test_llm_ner_parse.py 2>&1 | tail -2
 conda activate ie-rlcd-vllm
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 HFM=/scratch/u6sn/yangw.u6sn/huggingface_models
-# UniNER is not used: it asks one type per turn, so one span can get several types
-MODELS=(gner:dyyyyyyyy/GNER-LLaMA-7B slimer:expertai/SLIMER-LLaMA3)
+# UniNER and SLIMER are not used: they ask one type per prompt, so one span can get
+# several types; GNER tags each word once, like RLCD picks one label per span
+MODELS=(gner:dyyyyyyyy/GNER-LLaMA-7B)
 for mb in "${MODELS[@]}"; do
   id=${mb#*:}
   if [ ! -s $HFM/$id/config.json ] || ! ls $HFM/$id/*.safetensors $HFM/$id/*.bin >/dev/null 2>&1; then

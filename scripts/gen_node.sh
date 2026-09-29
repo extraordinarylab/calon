@@ -14,10 +14,10 @@ conda activate ie-rlcd-vllm
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 TASK=${TASK:?}; NSHARDS=${NSHARDS:?}
-EXTRA=""; case $TASK in r2|n|fill) EXTRA="--max-tokens 768";; g|g2|g3|c2|c3) EXTRA="--max-tokens 2048";; esac
+EXTRA=""; case $TASK in r2|n|fill|ra) EXTRA="--max-tokens 768";; jd) EXTRA="--max-tokens 384";; g|g2|g3|c2|c3) EXTRA="--max-tokens 2048";; esac
 for g in 0 1 2 3; do
   S=$((4 * SLURM_ARRAY_TASK_ID + g))
-  CUDA_VISIBLE_DEVICES=$g python -m ierlcd.llm_gen2 run --task $TASK --shard $S --num-shards $NSHARDS $EXTRA \
+  CUDA_VISIBLE_DEVICES=$g python -m ierlcd.llm_gen2 run --task $TASK --shard $S --num-shards $NSHARDS $EXTRA ${MODEL:+--model $MODEL} \
     > $TMPDIR/shard-$S.log 2>&1 &
 done
 wait

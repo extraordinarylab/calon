@@ -414,7 +414,10 @@ def build_prompt(task, r):
         return FILL_PROMPT.format(text=r["text"], types=types, current=current)
     if task == "r1":
         return A1_PROMPT.format(text=r["text"])
-    if task in ("r2", "n"):
+    if task == "jd":
+        from .refine import jd_prompt
+        return jd_prompt(r)
+    if task in ("r2", "n", "ra"):
         types = "\n".join(f'- "{t}": {d}' if d else f'- "{t}"' for t, d in r["query_types"])
         return A2_PROMPT.format(text=r["text"], types=types)
     types = "\n".join(f'- "{t}": {d}' if d else f'- "{t}"' for t, d in r["labels"])
@@ -435,9 +438,13 @@ def run(args):
           flush=True)
     if not todo:
         return
-    llm = LLM(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
-              gpu_memory_utilization=0.9, max_num_seqs=256, seed=0,
-              limit_mm_per_prompt={"image": 0, "video": 0})
+    kw = dict(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
+              gpu_memory_utilization=0.9, max_num_seqs=256, seed=0, trust_remote_code=True)
+    try:                                   # multimodal checkpoints: no vision / audio inputs
+        llm = LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0})
+    except Exception as exc:
+        print("retrying without limit_mm_per_prompt:", repr(exc)[:200], flush=True)
+        llm = LLM(**kw)
     sampled = args.task in ("g", "g2", "g3", "c2", "c3")
     for c in range(0, len(todo), args.chunk):
         chunk = todo[c:c + args.chunk]
@@ -739,7 +746,8 @@ def main():
     sub.add_parser("prepare-fill")
     sub.add_parser("apply-fill")
     p = sub.add_parser("run")
-    p.add_argument("--task", choices=["g", "g2", "g3", "c2", "c3", "r1", "r2", "n", "fill"], required=True)
+    p.add_argument("--task", choices=["g", "g2", "g3", "c2", "c3", "r1", "r2", "n", "fill", "ra", "jd"],
+                   required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--num-shards", type=int, default=1)

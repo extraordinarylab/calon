@@ -5,7 +5,7 @@
 #SBATCH --time=6:00:00
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=64
-# mneb/spy (legal) evaluation set: build + chunk, Qwen-authored descriptions, then
+# mneb/spy (legal + medical) evaluation sets: build + chunk, Qwen-authored descriptions, then
 # every model on it: GLiNER2 / gliformer / GNER baselines and our round-4 finals
 # (RLCD none weight 0.1 entity decoding, BCE; seeds 42-46; descriptions and names only).
 set -euo pipefail
@@ -44,7 +44,7 @@ OUT=$ROOT/runs2/spy; mkdir -p $OUT
   done
   conda activate ie-rlcd-vllm
   CUDA_VISIBLE_DEVICES=1 python -m ierlcd.llm_ner_eval --backend gner --model $HFM/dyyyyyyyy/GNER-LLaMA-7B \
-    --ood $P --sets spy_legal --out_dir $OUT/GNER-LLaMA-7B > $OUT/gner.log 2>&1 || echo "FAILED GNER" ) &
+    --ood $P --sets spy_legal spy_medical --out_dir $OUT/GNER-LLaMA-7B > $OUT/gner.log 2>&1 || echo "FAILED GNER" ) &
 ENC=$HFM/Qwen/Qwen3-0.6B
 for g in 2 3; do
   (
@@ -63,4 +63,4 @@ for g in 2 3; do
 done
 wait
 for f in $OUT/*.log; do echo "$(basename $f): $(tail -1 $f | cut -c1-200)"; done
-grep -h "^spy_legal" $OUT/gner.log | cut -c1-200 || true
+grep -hE "^spy_" $OUT/gner.log | cut -c1-200 || true

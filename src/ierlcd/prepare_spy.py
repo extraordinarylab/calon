@@ -1,5 +1,5 @@
-"""Evaluation set from mneb/spy (legal subset, test split): personal identifiers in
-English legal advice requests. Evaluation only, never trained on.
+"""Evaluation sets from mneb/spy: personal identifiers in English legal questions
+(spy_legal) and medical consultations (spy_medical). Evaluation only, never trained on.
 
 Documents run to ~8,500 characters, longer than our 1,024-token window and GNER's
 2,048-token context, so each document is cut into chunks of at most MAX_CHARS
@@ -19,6 +19,7 @@ ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 OUT = ROOT / "data/ood_spy"
 REPO = "mneb/spy"
 MAX_CHARS = 1200
+SET_OF = {"legal_questions": "spy_legal", "medical_consultations": "spy_medical"}
 NAMES = {"name": "name", "email": "email address", "phone_num": "phone number", "address": "address",
          "url": "URL", "username": "username", "id_num": "identification number"}
 
@@ -71,7 +72,7 @@ def build(args):
     api = HfApi()
     info = api.dataset_info(REPO)
     files = [f for f in api.list_repo_files(REPO, repo_type="dataset", revision=info.sha)
-             if f.endswith((".json", ".jsonl", ".parquet")) and not f.startswith(".")]
+             if Path(f).stem in SET_OF]
     stats, docs = collections.Counter(), []
     for f in files:
         path = hf_hub_download(REPO, f, repo_type="dataset", revision=info.sha, cache_dir=str(ROOT / "raw/hf"))
@@ -87,8 +88,9 @@ def build(args):
             out = rec["output"]
             if isinstance(out, str):
                 out = json.loads(out)
+            out = dict(out).get("entities", out)            # {"entities": {label: [spans]}}
             out = {c: (list(v) if v is not None else []) for c, v in dict(out).items()}
-            docs.append({"doc": f"{Path(f).stem}:{k}", "text": rec["input"],
+            docs.append({"set": SET_OF[Path(f).stem], "doc": f"{Path(f).stem}:{k}", "text": rec["input"],
                          "ents": entities_of(rec["input"], out, stats)})
     rows = []
     for d in docs:
@@ -96,7 +98,7 @@ def build(args):
             ents = [dict(e, start=e["start"] - a, end=e["end"] - a) for e in d["ents"]
                     if e["start"] >= a and e["end"] <= b]
             stats["entities_kept"] += len(ents)
-            rows.append({"id": f"{d['doc']}:{a}", "text": d["text"][a:b], "ents": ents})
+            rows.append({"set": d["set"], "id": f"{d['doc']}:{a}", "text": d["text"][a:b], "ents": ents})
     stats["entities_total"] = sum(len(d["ents"]) for d in docs)
     stats["docs"], stats["chunks"] = len(docs), len(rows)
     stats["chunks_over_limit"] = sum(len(r["text"]) > MAX_CHARS for r in rows)
@@ -116,7 +118,7 @@ def finish(args):
     train_labels = set()
     for line in open(ROOT / "data/mix/finerweb/train.jsonl"):
         train_labels |= {q["label"].lower().replace("_", " ") for q in json.loads(line)["queries"]}
-    out = []
+    by_set = collections.defaultdict(list)
     for r in rows:
         ents = [{"start": e["start"], "end": e["end"], "label": bank[e["code"]]["name"]} for e in r["ents"]]
         present = {e["label"] for e in ents}
@@ -125,22 +127,23 @@ def finish(args):
                     "description_origin": v["description_origin"],
                     "supervision_origin": "source" if v["name"] in present else "benchmark_closed_world"}
                    for v in bank.values()]
-        out.append({"id": f"spy_legal:test:{r['id']}", "source": "spy_legal", "text": r["text"],
-                    "queries": queries, "entities": ents})
-    with open(OUT / "spy_legal.jsonl", "w") as f:
-        for r in out:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        by_set[r["set"]].append({"id": f"{r['set']}:test:{r['id']}", "source": r["set"], "text": r["text"],
+                                 "queries": queries, "entities": ents})
     labels = [v["name"] for v in bank.values()]
     manifest = {"scope_policy": "benchmark_closed_world",
-                "splits_used": f"test (legal), documents cut into <= {MAX_CHARS}-character chunks",
+                "splits_used": f"all rows, documents cut into <= {MAX_CHARS}-character chunks",
                 "threshold_policy": "zero-shot: training sources' dev_calib T and threshold",
-                "descriptions": "authored by label_bank.py from the label name only",
-                "sets": {"spy_legal": {
-                    "repo": REPO, "rows": len(out), "entities": sum(len(r["entities"]) for r in out),
-                    "labels": labels, "seen_labels": [l for l in labels if l in train_labels],
-                    "unseen_labels": [l for l in labels if l not in train_labels]}}}
+                "descriptions": "authored by label_bank.py from the label name only", "sets": {}}
+    for name, out in sorted(by_set.items()):
+        with open(OUT / f"{name}.jsonl", "w") as f:
+            for r in out:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        manifest["sets"][name] = {
+            "repo": REPO, "rows": len(out), "entities": sum(len(r["entities"]) for r in out),
+            "labels": labels, "seen_labels": [l for l in labels if l in train_labels],
+            "unseen_labels": [l for l in labels if l not in train_labels]}
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
-    print(json.dumps(manifest["sets"]["spy_legal"])[:800])
+    print(json.dumps({k: {"rows": v["rows"], "entities": v["entities"]} for k, v in manifest["sets"].items()}))
 
 
 def main():

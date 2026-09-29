@@ -1,5 +1,5 @@
 """JSON extraction from LLM answers."""
-from ierlcd.newtest import final_text, last_json
+from ierlcd.eval.newtest import final_text, last_json
 
 
 def test_last_json_returns_outer_object():

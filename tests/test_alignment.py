@@ -5,9 +5,9 @@ import os
 import pytest
 import torch
 
-from ierlcd.alignment import build_candidates, coverage
-from ierlcd.collator import Collator, add_control_tokens, encode_row
-from ierlcd.prepare_data import adapt_finerweb, group_rows, split_groups
+from ierlcd.data.alignment import build_candidates, coverage
+from ierlcd.data.collator import Collator, add_control_tokens, encode_row
+from ierlcd.data.prepare_data import adapt_finerweb, group_rows, split_groups
 
 TEXTS = [
     ("Café Zoë met Zoë in Zürich .", [(0, 8, "org"), (13, 16, "person"), (20, 26, "city")]),

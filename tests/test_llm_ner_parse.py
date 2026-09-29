@@ -1,5 +1,5 @@
 """Answer parsing of the decoder-LLM baselines."""
-from ierlcd.llm_ner_eval import gner_parse, json_list
+from ierlcd.baselines.llm_ner_eval import gner_parse, json_list
 
 
 def test_gner_parse_offsets_and_bio():

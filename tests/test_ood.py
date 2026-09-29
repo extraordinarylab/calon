@@ -1,7 +1,7 @@
 """Error breakdown used by the OOD diagnostics."""
 import numpy as np
 
-from ierlcd.ood_eval import error_breakdown
+from ierlcd.eval.ood_eval import error_breakdown
 
 
 def test_error_breakdown_classes():

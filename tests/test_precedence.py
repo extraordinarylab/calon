@@ -1,7 +1,7 @@
 """Few-NERD precedence mode: most specific type wins, "other X" becomes the coarse type."""
 import json
 
-from ierlcd.mixdata import PRECEDENCE_NOTE, fewnerd_precedence
+from ierlcd.data.mixdata import PRECEDENCE_NOTE, fewnerd_precedence
 
 
 def test_precedence(tmp_path):

@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 
 from .llm_annotate import align, clean_type, parse_json, read_jsonl, write_jsonl
+from .newtest import final_text, last_json
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 S2 = ROOT / "synth2"
@@ -156,7 +157,7 @@ def apply(args):
         keep = set(agreed)
         if disputed:
             req, o = jreq.get(r["id"]), jout.get(r["id"])
-            js = parse_json(o["output"]) if o else None
+            js = last_json(final_text(o["output"])) if o else None
             if req is None or not isinstance(js, dict):
                 stats[f"{src}_jd_missing"] += 1
                 keep |= {(e["start"], e["end"], e["label"]) for e in r["entities"]}   # fall back to Qwen

@@ -453,7 +453,7 @@ def run(args):
         params = ([SamplingParams(temperature=0.9, top_p=0.95, max_tokens=args.max_tokens,
                                   seed=seed_of(r["id"])) for r in chunk] if sampled else
                   SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
-        outs = llm.chat(msgs, params, chat_template_kwargs={"enable_thinking": False})
+        outs = llm.chat(msgs, params, chat_template_kwargs={"enable_thinking": False, "reasoning_effort": "low"})
         with open(out_path, "a") as f:
             for r, o in zip(chunk, outs):
                 g = o.outputs[0]

@@ -100,6 +100,8 @@ def llm(model, max_len=8192):
     from vllm import LLM
     kw = dict(model=model, max_model_len=max_len, gpu_memory_utilization=0.9, max_num_seqs=128,
               trust_remote_code=True)
+    if "mistral" in model.lower():         # HF config and weights, Mistral's own (tekken) tokenizer
+        kw.update(config_format="hf", tokenizer_mode="mistral")
     try:
         return LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0})
     except Exception as exc:

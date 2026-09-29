@@ -17,6 +17,13 @@ def test_gner_parse_multiword_label_and_skipped_word():
     assert {(text[s:e], l) for s, e, l in got} == {("The Clash", "band"), ("London", "musical place")}
 
 
+def test_gner_punctuation_split():
+    text = "in Poland, Latvia."
+    ans = "in(O) Poland(B-country) ,(O) Latvia(B-country) .(O)"
+    got = gner_parse(ans, text, ["country"])
+    assert {text[s:e] for s, e, _ in got} == {"Poland", "Latvia"}
+
+
 def test_json_list():
     assert json_list('["a", "b c"]') == ["a", "b c"]
     assert json_list("[]") == []

@@ -41,7 +41,9 @@ TAG = re.compile(r"(\S+)\(((?:B-|I-)[^()]*|O)\)")
 
 
 def words_of(text):
-    return [(m.group(), m.start(), m.end()) for m in re.finditer(r"\S+", text)]
+    """CoNLL-style words (punctuation split off, as in GNER's training data), so a
+    tagged word never carries a trailing comma into the entity span."""
+    return [(m.group(), m.start(), m.end()) for m in re.finditer(r"\w+|[^\w\s]", text)]
 
 
 def gner_prompt(text, labels):

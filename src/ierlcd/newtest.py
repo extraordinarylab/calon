@@ -59,39 +59,69 @@ Return JSON only: a list of strings."""
 
 
 def api(params):
-    q = urllib.parse.urlencode({**params, "format": "json", "formatversion": 2})
-    for attempt in range(5):
+    """One API call; on 429 / errors wait (Retry-After when given) and retry."""
+    import urllib.error
+    q = urllib.parse.urlencode({**params, "format": "json", "formatversion": 2, "maxlag": 5})
+    for attempt in range(8):
         try:
-            with urllib.request.urlopen(urllib.request.Request(f"{API}?{q}", headers=UA), timeout=60) as r:
-                return json.load(r)
-        except Exception as exc:                  # transient network / rate limit
-            time.sleep(5 * (attempt + 1))
+            with urllib.request.urlopen(urllib.request.Request(f"{API}?{q}", headers=UA), timeout=30) as r:
+                d = json.load(r)
+            if d.get("error", {}).get("code") == "maxlag":
+                raise RuntimeError("maxlag")
+            return d
+        except Exception as exc:                  # rate limit / transient network
+            wait = 10 * (attempt + 1)
+            if isinstance(exc, urllib.error.HTTPError) and exc.headers.get("Retry-After", "").isdigit():
+                wait = max(wait, int(exc.headers["Retry-After"]))
+            print(f"api retry {attempt + 1} in {wait}s: {exc!r}"[:200], flush=True)
+            time.sleep(wait)
             err = exc
     raise err
 
 
 def fetch_wiki(args):
-    titles, cont = [], {}
-    while True:
-        d = api({"action": "query", "list": "logevents", "letype": "create", "lenamespace": 0,
-                 "lestart": START, "leend": END, "ledir": "newer", "lelimit": 500, **cont})
-        titles += [e["title"] for e in d["query"]["logevents"] if "title" in e]
-        if "continue" not in d:
-            break
-        cont = d["continue"]
-        time.sleep(0.5)
-    titles = sorted(set(titles))
-    pages = []
-    for k in range(0, len(titles), 20):
-        d = api({"action": "query", "prop": "extracts|pageprops", "exintro": 1, "explaintext": 1,
-                 "exlimit": 20, "redirects": 1, "titles": "|".join(titles[k:k + 20])})
-        for p in d["query"].get("pages", []):
-            text = (p.get("extract") or "").strip()
-            if p.get("missing") or "disambiguation" in (p.get("pageprops") or {}) or len(text.split()) < 30:
-                continue
-            pages.append({"id": f"wiki:{p['pageid']}", "title": p["title"], "text": text})
-        time.sleep(0.3)
+    """Titles created in [START, END), then their lead sections. Resumable: titles and
+    fetched batches are cached under newtest/."""
     W.mkdir(parents=True, exist_ok=True)
+    tpath = W / "wiki_titles.json"
+    if tpath.exists():
+        titles = json.loads(tpath.read_text())
+    else:
+        titles, cont = [], {}
+        while True:
+            d = api({"action": "query", "list": "logevents", "letype": "create", "lenamespace": 0,
+                     "lestart": START, "leend": END, "ledir": "newer", "lelimit": 500, **cont})
+            titles += [e["title"] for e in d["query"]["logevents"] if "title" in e]
+            print("titles", len(titles), flush=True)
+            if "continue" not in d:
+                break
+            cont = d["continue"]
+            time.sleep(1.0)
+        titles = sorted(set(titles))
+        tpath.write_text(json.dumps(titles))
+    ppath = W / "wiki_pages_partial.jsonl"
+    done = set()
+    if ppath.exists():
+        for line in open(ppath):
+            done.add(json.loads(line)["batch"])
+    with open(ppath, "a") as f:
+        for b, k in enumerate(range(0, len(titles), 20)):
+            if b in done:
+                continue
+            d = api({"action": "query", "prop": "extracts|pageprops", "exintro": 1, "explaintext": 1,
+                     "exlimit": 20, "redirects": 1, "titles": "|".join(titles[k:k + 20])})
+            pages = []
+            for p in d["query"].get("pages", []):
+                text = (p.get("extract") or "").strip()
+                if p.get("missing") or "disambiguation" in (p.get("pageprops") or {}) or len(text.split()) < 30:
+                    continue
+                pages.append({"id": f"wiki:{p['pageid']}", "title": p["title"], "text": text})
+            f.write(json.dumps({"batch": b, "pages": pages}) + "\n")
+            f.flush()
+            if b % 50 == 0:
+                print(f"batch {b} / {len(titles) // 20 + 1}", flush=True)
+            time.sleep(1.0)
+    pages = [p for line in open(ppath) for p in json.loads(line)["pages"]]
     write_jsonl(W / "wiki_pages.jsonl", pages)
     print(json.dumps({"created_titles": len(titles), "pages_with_lead": len(pages), "window": [START, END]}))
 

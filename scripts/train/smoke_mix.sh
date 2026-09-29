@@ -23,7 +23,7 @@ step() { echo "== $1 $(date +%T)"; }
 
 conda activate ie-rlcd
 step tests;      python -m pytest -q tests 2>&1 | tail -3
-step inventory;  python -m ierlcd.data.prepare_mix --stage inventory --out $MIX
+step inventory;  python -m calon.data.prepare_mix --stage inventory --out $MIX
 
 if [ ! -s $BANK ]; then
   # Existing vLLM envs do not work here: lco-embed/world carry a flash_attn built for
@@ -35,23 +35,23 @@ if [ ! -s $BANK ]; then
   fi
   conda activate ie-rlcd-vllm
   step label_bank
-  python -m ierlcd.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
+  python -m calon.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $ROOT/label_bank.log 2>&1 || { tail -20 $ROOT/label_bank.log; exit 1; }
   tail -8 $ROOT/label_bank.log
   conda activate ie-rlcd
 fi
 
-step build;      python -m ierlcd.data.prepare_mix --stage build --bank $BANK --out $MIX 2>&1 | tail -60
+step build;      python -m calon.data.prepare_mix --stage build --bank $BANK --out $MIX 2>&1 | tail -60
 step train
 rm -rf $RUN
-python -m ierlcd.train.train --data $MIX --out $RUN --updates 200 --eval_every 100 --eval_limit 200 \
+python -m calon.train.train --data $MIX --out $RUN --updates 200 --eval_every 100 --eval_limit 200 \
   2>&1 | grep -E "loaded|EVAL|done|Error|error" | cut -c1-400
 tail -1 $RUN/log.jsonl | cut -c1-300
 step calibrate
-python -m ierlcd.train.calibrate --data $MIX --ckpt $RUN/final.pt --limit 200 \
+python -m calon.train.calibrate --data $MIX --ckpt $RUN/final.pt --limit 200 \
   --out $RUN/calibration.json 2>&1 | tail -6
 step ood
-python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --ckpt $RUN/final.pt \
+python -m calon.eval.ood_eval --ood $ROOT/data/ood --ckpt $RUN/final.pt \
   --calibration $RUN/calibration.json --out $RUN/ood.json 2>&1 | grep -E "macro|Error" | cut -c1-300
 nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader
 step done

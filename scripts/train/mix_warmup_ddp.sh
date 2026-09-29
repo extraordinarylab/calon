@@ -27,13 +27,13 @@ RUNS=$ROOT/runs/$EXP-s$SEED
 mkdir -p $RUNS
 git rev-parse HEAD > $RUNS/git_commit.txt
 echo "$MIXSPEC $ENCODER" > $RUNS/config.txt
-torchrun --standalone --nproc_per_node=4 -m ierlcd.train.train --data $MIX --out $RUNS/warmup \
+torchrun --standalone --nproc_per_node=4 -m calon.train.train --data $MIX --out $RUNS/warmup \
   --mix $MIXSPEC --encoder $ENCODER --mode bce --updates $UPDATES --eval_every 1000 \
   --workers 12 --seed $SEED > $RUNS/warmup.log 2>&1
 grep -E "EVAL|done" $RUNS/warmup.log | cut -c1-300
-python -m ierlcd.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER \
+python -m calon.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER \
   --ckpt $RUNS/warmup/best.pt --out $RUNS/warmup/calibration.json > $RUNS/warmup-calib.log 2>&1
-python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --ckpt $RUNS/warmup/best.pt \
+python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --ckpt $RUNS/warmup/best.pt \
   --calibration $RUNS/warmup/calibration.json --out $RUNS/warmup/ood.json \
   > $RUNS/warmup-ood.log 2>&1
 echo "===== WARMUP $EXP s$SEED DONE ====="

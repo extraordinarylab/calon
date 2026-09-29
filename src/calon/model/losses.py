@@ -16,8 +16,8 @@ import torch
 import torch.nn.functional as F
 
 
-def rlcd_log_probs(u, label_ok):
-    """RLCD choice distribution per span over [none, label_1..label_M].
+def calon_log_probs(u, label_ok):
+    """CalOn choice distribution per span over [none, label_1..label_M].
 
     u: [B, 1+M, C] utilities (none first); label_ok: [B, M] bool, the labels that
     are queried with known status. Unqueried / unknown / padded labels get -inf.
@@ -26,7 +26,7 @@ def rlcd_log_probs(u, label_ok):
     return torch.log_softmax(u.float().masked_fill(~ok, float("-inf")), 1)
 
 
-def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, none_weight=1.0):
+def calon_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, none_weight=1.0):
     """Plackett-Luce single-choice loss plus multiway Brier score, per span.
 
     Each candidate span chooses one of [none, queried labels]. Target: its gold
@@ -42,7 +42,7 @@ def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, 
     gold = (y > 0) & valid                                  # [B,M,C]
     has_gold = gold.any(1)                                  # [B,C]
     span_ok = cand_mask & (has_gold | ~unknown_row[:, None])
-    logp = rlcd_log_probs(u, known)                         # [B,1+M,C]
+    logp = calon_log_probs(u, known)                         # [B,1+M,C]
     target = torch.cat([~has_gold[:, None, :], gold], 1)
     ce = -logp.masked_fill(~target, float("-inf")).logsumexp(1)
     p = logp.exp()
@@ -61,8 +61,8 @@ def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, 
     if stats is not None:
         def row_mean(x):
             return (torch.where(span_ok, x, torch.zeros_like(x)).sum(-1) / cnt.clamp_min(1))[active].mean().item()
-        stats["rlcd_ce"] = row_mean(ce)
-        stats["rlcd_brier"] = row_mean(brier)
+        stats["calon_ce"] = row_mean(ce)
+        stats["calon_brier"] = row_mean(brier)
     return per_row[active].mean()
 
 

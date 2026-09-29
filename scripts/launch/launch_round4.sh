@@ -27,7 +27,7 @@ echo "phase1: ${P1[*]}"; echo "${P1[*]}" > $ROOT/runs2/p1_ids.txt
 
 export IE_MIX=$ROOT/data/mix3
 C=$(sub -p workq --time=2:00:00 --gres=gpu:1 --cpus-per-task=16 -o logs/%j-mix3.out --job-name=mix3-prep --dependency=afterok:$T \
-    --wrap="$PRE; rm -rf $ROOT/data/mix3; cp -r $ROOT/data/mix2 $ROOT/data/mix3; python -m ierlcd.synth.llm_gen2 prepare-g3 --n 370000; python -m ierlcd.synth.llm_gen2 prepare-fill")
+    --wrap="$PRE; rm -rf $ROOT/data/mix3; cp -r $ROOT/data/mix2 $ROOT/data/mix3; python -m calon.synth.llm_gen2 prepare-g3 --n 370000; python -m calon.synth.llm_gen2 prepare-fill")
 G3=$(sub --dependency=afterok:$C --array=0-31 --export=ALL,TASK=g3,NSHARDS=128 --job-name=gen4-g3 scripts/synth/gen_node.sh)
 FI=$(sub --dependency=afterok:$C --array=0-15 --export=ALL,TASK=fill,NSHARDS=64 --job-name=gen4-fill scripts/synth/gen_node.sh)
 AF=$(sub --dependency=afterok:$FI --export=ALL,ARGS="apply-fill" --job-name=gen4-apply-fill scripts/synth/gen2_step.sh)

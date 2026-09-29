@@ -16,7 +16,7 @@ SEED=${SEED:-42}
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 RUNS=$ROOT/runs/fw-s$SEED
 OOD=$ROOT/data/ood
-python -m ierlcd.data.prepare_ood --train $ROOT/data/finerweb/train.jsonl --out $OOD
+python -m calon.data.prepare_ood --train $ROOT/data/finerweb/train.jsonl --out $OOD
 
 CKPTS=("warmup best.pt")
 for arm in bce-s0.2 bce_scaled-s0.2 direct-s0.2 pg-s0.2 direct-s1.0 pg-s1.0 direct-s2.0 pg-s2.0; do
@@ -25,7 +25,7 @@ done
 i=0
 for c in "${CKPTS[@]}"; do
   read NAME FILE <<< "$c"
-  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m ierlcd.eval.ood_eval --ood $OOD --ckpt $RUNS/$NAME/$FILE \
+  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m calon.eval.ood_eval --ood $OOD --ckpt $RUNS/$NAME/$FILE \
     --calibration $RUNS/$NAME/calibration.json --out $RUNS/$NAME/ood.json \
     > $RUNS/$NAME-ood.log 2>&1 &
   i=$((i + 1))

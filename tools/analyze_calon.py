@@ -1,4 +1,4 @@
-"""Why does RLCD lose to BCE on some OOD sets? Compact comparison from saved ood.json.
+"""Why does CalOn lose to BCE on some OOD sets? Compact comparison from saved ood.json.
 
 For each OOD set: precision / recall / F1 and absent-query FPR of both heads
 (mean over seeds), the error breakdown, the per-label F1 with the largest

@@ -1,8 +1,8 @@
 """Refinement helpers: second-opinion alignment and judge prompt."""
 import collections
 
-from ierlcd.data.prepare_mix import find_all
-from ierlcd.synth.refine import jd_prompt, second_opinion
+from calon.data.prepare_mix import find_all
+from calon.synth.refine import jd_prompt, second_opinion
 
 
 def row():

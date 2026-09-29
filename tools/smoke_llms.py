@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from ierlcd.synth.llm_annotate import A2_PROMPT, clean_type
+from calon.synth.llm_annotate import A2_PROMPT, clean_type
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 
@@ -30,7 +30,7 @@ def main():
         types = "\n".join(f'- "{q["label"]}": {q["description"]}' if q["description"] else f'- "{q["label"]}"'
                           for q in qs)
         prompts.append([{"role": "user", "content": A2_PROMPT.format(text=r["text"], types=types)}])
-    from ierlcd.eval.newtest import chat, last_json, llm
+    from calon.eval.newtest import chat, last_json, llm
     t0 = time.time()
     engine = llm(args.model)
     load = time.time() - t0

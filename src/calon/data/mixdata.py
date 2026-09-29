@@ -113,7 +113,7 @@ def fewnerd_coarse_names(data):
 
 def fine_only(rows, coarse):
     """Few-NERD with its 8 coarse types removed (queries and mentions): each span
-    then has exactly one gold type, as a single-choice RLCD head needs."""
+    then has exactly one gold type, as a single-choice CalOn head needs."""
     out = []
     for r in rows:
         r = dict(r)

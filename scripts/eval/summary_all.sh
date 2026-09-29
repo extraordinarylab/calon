@@ -14,5 +14,5 @@ conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src
 R=/scratch/u6sn/yangw.u6sn/ie-rlcd/${ROOT_RUNS:-runs}
-python -m ierlcd.eval.summarize --root $R --exps ${EXPS:?} --json_out $R/all-results.json > $R/all-summary.txt 2>&1
+python -m calon.eval.summarize --root $R --exps ${EXPS:?} --json_out $R/all-results.json > $R/all-summary.txt 2>&1
 wc -l $R/all-summary.txt

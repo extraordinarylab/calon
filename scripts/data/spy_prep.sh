@@ -18,13 +18,13 @@ ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 P=$ROOT/data/ood_spy
 HFM=/scratch/u6sn/yangw.u6sn/huggingface_models
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_spy build 2>&1 | tail -1 | cut -c1-900
+python -m calon.data.prepare_spy build 2>&1 | tail -1 | cut -c1-900
 conda activate ie-rlcd-vllm
-HF_HUB_OFFLINE=1 python -m ierlcd.synth.label_bank --inventory $P/inventory.json \
+HF_HUB_OFFLINE=1 python -m calon.synth.label_bank --inventory $P/inventory.json \
   --model $HFM/Qwen/Qwen3.8-27B --out $P/label_bank.json > $P/label_bank.log 2>&1
 tail -8 $P/label_bank.log | cut -c1-250
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_spy finish 2>&1 | tail -1 | cut -c1-800
+python -m calon.data.prepare_spy finish 2>&1 | tail -1 | cut -c1-800
 export HF_HUB_OFFLINE=1
 OUT=$ROOT/runs2/spy; mkdir -p $OUT
 (   # GPU 0: GLiNER2
@@ -32,18 +32,18 @@ OUT=$ROOT/runs2/spy; mkdir -p $OUT
   for M in fastino/gliner2-base-v1 fastino/gliner2-large-v1; do
     for V in desc name_only; do
       FLAG=""; [ $V = name_only ] && FLAG=--name_only
-      CUDA_VISIBLE_DEVICES=0 python -m ierlcd.baselines.gliner2_eval --ood $P --model $M $FLAG \
+      CUDA_VISIBLE_DEVICES=0 python -m calon.baselines.gliner2_eval --ood $P --model $M $FLAG \
         --out $OUT/$(basename $M)-$V.json > $OUT/$(basename $M)-$V.log 2>&1 || echo "FAILED $M $V"
     done
   done ) &
 (   # GPU 1: gliformer, then GNER
   conda activate $CONDA/envs/gliformer
   for M in knowledgator/gliformer-base-v1 knowledgator/gliformer-large-v1; do
-    CUDA_VISIBLE_DEVICES=1 python -m ierlcd.baselines.gliner2_eval --backend gliformer --name_only --ood $P --model $M \
+    CUDA_VISIBLE_DEVICES=1 python -m calon.baselines.gliner2_eval --backend gliformer --name_only --ood $P --model $M \
       --out $OUT/$(basename $M)-name_only.json > $OUT/$(basename $M)-name_only.log 2>&1 || echo "FAILED $M"
   done
   conda activate ie-rlcd-vllm
-  CUDA_VISIBLE_DEVICES=1 python -m ierlcd.baselines.llm_ner_eval --backend gner --model $HFM/dyyyyyyyy/GNER-LLaMA-7B \
+  CUDA_VISIBLE_DEVICES=1 python -m calon.baselines.llm_ner_eval --backend gner --model $HFM/dyyyyyyyy/GNER-LLaMA-7B \
     --ood $P --sets spy_legal spy_medical --out_dir $OUT/GNER-LLaMA-7B > $OUT/gner.log 2>&1 || echo "FAILED GNER" ) &
 ENC=$HFM/Qwen/Qwen3-0.6B
 for g in 2 3; do
@@ -55,7 +55,7 @@ for g in 2 3; do
       R=$ROOT/runs2/p2-z4-s$S
       for V in desc name_only; do
         FLAG=""; [ $V = name_only ] && FLAG=--name_only
-        CUDA_VISIBLE_DEVICES=$g python -m ierlcd.eval.ood_eval --ood $P --encoder $ENC --head $HEAD --decode $DEC $FLAG \
+        CUDA_VISIBLE_DEVICES=$g python -m calon.eval.ood_eval --ood $P --encoder $ENC --head $HEAD --decode $DEC $FLAG \
           --ckpt $R/$ARM/best.pt --calibration $R/$EVAL/calibration.json \
           --out $R/$EVAL/ood-spy-$V.json > $R/$EVAL-ood-spy-$V.log 2>&1 || echo "FAILED $EVAL s$S $V"
       done

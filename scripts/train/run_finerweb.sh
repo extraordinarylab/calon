@@ -18,7 +18,7 @@ RUNS=/scratch/u6sn/yangw.u6sn/ie-rlcd/runs/fw-s$SEED
 mkdir -p $RUNS
 git rev-parse HEAD > $RUNS/git_commit.txt
 
-CUDA_VISIBLE_DEVICES=0 python -m ierlcd.train.train --data $DATA --out $RUNS/warmup --mode bce \
+CUDA_VISIBLE_DEVICES=0 python -m calon.train.train --data $DATA --out $RUNS/warmup --mode bce \
   --updates 10000 --micro 32 --eval_every 500 --seed $SEED > $RUNS/warmup.log 2>&1
 INIT=$RUNS/warmup/best.pt
 
@@ -27,20 +27,20 @@ for wave in 0 4; do
   for g in 0 1 2 3; do
     read MODE SIGMA <<< "${ARMS[$((wave + g))]}"
     NAME=$MODE-s$SIGMA
-    CUDA_VISIBLE_DEVICES=$g python -m ierlcd.train.train --data $DATA --out $RUNS/$NAME --init $INIT \
+    CUDA_VISIBLE_DEVICES=$g python -m calon.train.train --data $DATA --out $RUNS/$NAME --init $INIT \
       --mode $MODE --sigma $SIGMA --updates 2000 --micro 32 --eval_every 250 --seed $SEED \
       > $RUNS/$NAME.log 2>&1 &
   done
   wait
 done
 
-CUDA_VISIBLE_DEVICES=0 python -m ierlcd.train.calibrate --data $DATA --ckpt $INIT \
+CUDA_VISIBLE_DEVICES=0 python -m calon.train.calibrate --data $DATA --ckpt $INIT \
   --out $RUNS/warmup/calibration.json > $RUNS/warmup-calib.log 2>&1 &
 i=1
 for arm in "${ARMS[@]}"; do
   read MODE SIGMA <<< "$arm"
   NAME=$MODE-s$SIGMA
-  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m ierlcd.train.calibrate --data $DATA \
+  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m calon.train.calibrate --data $DATA \
     --ckpt $RUNS/$NAME/final.pt --out $RUNS/$NAME/calibration.json > $RUNS/$NAME-calib.log 2>&1 &
   i=$((i + 1))
   (( i % 4 == 0 )) && wait

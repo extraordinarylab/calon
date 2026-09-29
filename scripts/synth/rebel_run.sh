@@ -13,4 +13,4 @@ source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd-vllm
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
-python -m ierlcd.synth.llm_rebel run --shard $SLURM_ARRAY_TASK_ID 2>&1 | grep -E "^shard|^chunk|Error|error" | cut -c1-200
+python -m calon.synth.llm_rebel run --shard $SLURM_ARRAY_TASK_ID 2>&1 | grep -E "^shard|^chunk|Error|error" | cut -c1-200

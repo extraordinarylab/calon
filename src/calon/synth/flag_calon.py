@@ -1,4 +1,4 @@
-"""Round-5 refinement, step 2: our RLCD model reads the synthetic train rows and
+"""Round-5 refinement, step 2: our CalOn model reads the synthetic train rows and
 flags spans for the judge.
 
   extra  spans with p(entity) >= --hi that the current (Qwen) labels lack, labelled
@@ -16,7 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from ..data.collator import Collator, add_control_tokens, encode_row
-from ..eval.evaluate import predict, rlcd_probs
+from ..eval.evaluate import calon_probs, predict
 from ..model.model import load_model
 from .llm_annotate import read_jsonl
 from .refine import MIX_DIR, S2, SOURCES
@@ -35,7 +35,7 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.encoder)
     lab_id, txt_id = add_control_tokens(tok)
     collate = Collator(tok, lab_id, txt_id)
-    model = load_model(args.encoder, len(tok), args.W, "rlcd", args.ckpt)
+    model = load_model(args.encoder, len(tok), args.W, "calon", args.ckpt)
     out_path = S2 / "rlcd_flags" / f"shard-{args.shard:05d}-of-{args.num_shards:05d}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     rows = [r for src in SOURCES for r in read_jsonl(MIX_DIR / src / "train.jsonl")]
@@ -53,7 +53,7 @@ def main():
             with torch.no_grad():
                 outs = predict(model, encs, collate, "cuda")
             for r, e, o in zip(chunk, encs, outs):
-                p = rlcd_probs(o, 1.0)                              # [1+M, C]
+                p = calon_probs(o, 1.0)                              # [1+M, C]
                 if p.shape[1] == 0:
                     continue
                 p_ent = 1.0 - p[0]

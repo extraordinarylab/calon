@@ -29,11 +29,11 @@ RUNS=$ROOT/runs/$EXP-s$SEED
 INIT=$ROOT/runs/$INIT_EXP-s$SEED/warmup/best.pt
 NAME=$MODE-s$SIGMA$TAG
 mkdir -p $RUNS
-python -m ierlcd.train.train --data $MIX --out $RUNS/$NAME --init $INIT --mix $MIXSPEC --encoder $ENCODER \
+python -m calon.train.train --data $MIX --out $RUNS/$NAME --init $INIT --mix $MIXSPEC --encoder $ENCODER \
   --mode $MODE --sigma $SIGMA --alpha $ALPHA --updates 2000 --eval_every 500 --workers 14 \
   --seed $SEED > $RUNS/$NAME.log 2>&1
-python -m ierlcd.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER \
+python -m calon.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER \
   --ckpt $RUNS/$NAME/final.pt --out $RUNS/$NAME/calibration.json > $RUNS/$NAME-calib.log 2>&1
-python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --ckpt $RUNS/$NAME/final.pt \
+python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --ckpt $RUNS/$NAME/final.pt \
   --calibration $RUNS/$NAME/calibration.json --out $RUNS/$NAME/ood.json > $RUNS/$NAME-ood.log 2>&1
 echo "===== FORK $EXP s$SEED $NAME DONE ====="

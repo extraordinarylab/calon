@@ -19,12 +19,12 @@ ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 MIX=$ROOT/data/mix2
 RUNS=$ROOT/runs2/$EXP-s$SEED
 NAME=$HEAD-dd$DDROP
-python -m ierlcd.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD \
+python -m calon.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD \
   --fewnerd_fine_only --ckpt $RUNS/$NAME/best.pt --out $RUNS/$NAME/calibration.json \
   > $RUNS/$NAME-calib.log 2>&1
 for V in desc name_only; do
   FLAG=""; [ $V = name_only ] && FLAG=--name_only
-  python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD $FLAG \
+  python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD $FLAG \
     --ckpt $RUNS/$NAME/best.pt --calibration $RUNS/$NAME/calibration.json \
     --out $RUNS/$NAME/ood-$V.json > $RUNS/$NAME-ood-$V.log 2>&1
 done

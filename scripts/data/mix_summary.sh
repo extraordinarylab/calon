@@ -14,7 +14,7 @@ cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src
 R=/scratch/u6sn/yangw.u6sn/ie-rlcd/runs
 {
-  python -m ierlcd.eval.summarize --seeds $R/mix-s42 $R/mix-s43 $R/mix-s44 --baseline $R/fw-s42
-  python -m ierlcd.eval.summarize --runs $R/mix-s42 --baseline $R/fw-s42
+  python -m calon.eval.summarize --seeds $R/mix-s42 $R/mix-s43 $R/mix-s44 --baseline $R/fw-s42
+  python -m calon.eval.summarize --runs $R/mix-s42 --baseline $R/fw-s42
 } > $R/mix-summary.txt 2>&1
 wc -l $R/mix-summary.txt

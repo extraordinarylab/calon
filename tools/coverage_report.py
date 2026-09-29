@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 from transformers import AutoTokenizer
 
-from ierlcd.data.alignment import coverage, tokenize_text
-from ierlcd.data.collator import load_rows
+from calon.data.alignment import coverage, tokenize_text
+from calon.data.collator import load_rows
 
 
 def main():

@@ -7,7 +7,7 @@
 # on the round-3 zero-shot mixture, each on 4 nodes, with OOD + PII evaluation.
 set -euo pipefail
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
-A=$(sbatch --parsable --export=ALL --job-name=audit-remove --wrap="export TMPDIR=/tmp/\$USER-\$SLURM_JOB_ID; mkdir -p \$TMPDIR; source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh; conda activate ie-rlcd; cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd; PYTHONPATH=src python -m ierlcd.data.audit_leak --mix /scratch/u6sn/yangw.u6sn/ie-rlcd/data/mix2 --remove --out /scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/leak_audit_removed.json" \
+A=$(sbatch --parsable --export=ALL --job-name=audit-remove --wrap="export TMPDIR=/tmp/\$USER-\$SLURM_JOB_ID; mkdir -p \$TMPDIR; source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh; conda activate ie-rlcd; cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd; PYTHONPATH=src python -m calon.data.audit_leak --mix /scratch/u6sn/yangw.u6sn/ie-rlcd/data/mix2 --remove --out /scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/leak_audit_removed.json" \
      -p workq --time=1:00:00 --gres=gpu:1 --cpus-per-task=16 -o logs/%j-audit-remove.out)
 echo "audit-remove $A"
 export ENCODER=/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3-0.6B EXP=final-z3

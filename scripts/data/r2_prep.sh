@@ -20,8 +20,8 @@ MIX2=$ROOT/data/mix2
 step() { echo "== $1 $(date +%T)"; }
 
 step mix2
-python -m ierlcd.data.prepare_mix --stage inventory --out $MIX2 | tail -1
-python -m ierlcd.data.prepare_mix --stage build --bank $ROOT/data/mix/label_bank_v2.json --out $MIX2 \
+python -m calon.data.prepare_mix --stage inventory --out $MIX2 | tail -1
+python -m calon.data.prepare_mix --stage build --bank $ROOT/data/mix/label_bank_v2.json --out $MIX2 \
   --max_tokens 1024 > $MIX2.build.log 2>&1; tail -2 $MIX2.build.log | cut -c1-300
 rm -rf $MIX2/synth_a && cp -r $ROOT/data/mix/synth_a $MIX2/synth_a
 
@@ -39,11 +39,11 @@ cat $Q3/REVISION
 QWEN_TEST_PATH=$Q3 python -m pytest -q tests 2>&1 | tail -2
 
 step real_text
-python -m ierlcd.synth.llm_gen2 fetch-real 2>&1 | tail -1 | cut -c1-500
+python -m calon.synth.llm_gen2 fetch-real 2>&1 | tail -1 | cut -c1-500
 step requests
-python -m ierlcd.synth.llm_gen2 prepare-g --n 120000 | tail -1
-python -m ierlcd.synth.llm_gen2 prepare-c2 --per-domain 2060 | tail -1
-python -m ierlcd.synth.llm_gen2 prepare-n | tail -3
+python -m calon.synth.llm_gen2 prepare-g --n 120000 | tail -1
+python -m calon.synth.llm_gen2 prepare-c2 --per-domain 2060 | tail -1
+python -m calon.synth.llm_gen2 prepare-n | tail -3
 
 step gliner2_env
 G=$CONDA/envs/gliner2

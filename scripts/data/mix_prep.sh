@@ -17,14 +17,14 @@ MIX=$ROOT/data/mix
 BANK=$MIX/label_bank_v2.json
 QWEN=/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_mix --stage inventory --out $MIX
+python -m calon.data.prepare_mix --stage inventory --out $MIX
 if [ ! -s $BANK ]; then
   conda activate ie-rlcd-vllm
-  python -m ierlcd.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
+  python -m calon.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $MIX/label_bank_v2.log 2>&1 || { tail -20 $MIX/label_bank_v2.log; exit 1; }
   tail -8 $MIX/label_bank_v2.log
   conda activate ie-rlcd
 fi
-python -m ierlcd.data.prepare_mix --stage build --bank $BANK --out $MIX > $MIX/build.log 2>&1
+python -m calon.data.prepare_mix --stage build --bank $BANK --out $MIX > $MIX/build.log 2>&1
 tail -3 $MIX/build.log
 echo "===== PREP DONE ====="

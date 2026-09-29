@@ -12,16 +12,16 @@
 
 | Path | Contents |
 | --- | --- |
-| `src/ierlcd/model/` | span-label model, losses |
-| `src/ierlcd/data/` | tokenization / candidates, collator, source adapters, mixture sampling, eval-set builders, leakage audit |
-| `src/ierlcd/synth/` | LLM generation / annotation (Qwen, REBEL), label descriptions, refinement (re-annotation, RLCD flags, judge) |
-| `src/ierlcd/train/` | DDP training, calibration |
-| `src/ierlcd/eval/` | metrics, OOD evaluation, summaries, fresh contamination test sets |
-| `src/ierlcd/baselines/` | GLiNER2 / gliformer, InstructUIE, GNER evaluation |
+| `src/calon/model/` | span-label model, losses |
+| `src/calon/data/` | tokenization / candidates, collator, source adapters, mixture sampling, eval-set builders, leakage audit |
+| `src/calon/synth/` | LLM generation / annotation (Qwen, REBEL), label descriptions, refinement (re-annotation, CalOn flags, judge) |
+| `src/calon/train/` | DDP training, calibration |
+| `src/calon/eval/` | metrics, OOD evaluation, summaries, fresh contamination test sets |
+| `src/calon/baselines/` | GLiNER2 / gliformer, InstructUIE, GNER evaluation |
 | `tools/` | one-off analyses and smoke tests (not part of the package; run as `python -m tools.<name>` from the repo root) |
 | `scripts/<env,data,synth,train,eval,baselines,launch>/` | sbatch scripts by purpose; `launch/` scripts only call sbatch |
 
-New code goes into the matching subpackage; nothing new at `src/ierlcd/` top level.
+New code goes into the matching subpackage; nothing new at `src/calon/` top level.
 
 ## Never compute on the login node
 

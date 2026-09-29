@@ -15,7 +15,7 @@ import numpy as np
 from transformers import AutoTokenizer
 
 from ..data.collator import Collator, add_control_tokens, encode_row, load_rows
-from ..model.model import load_model
+from ..model.model import canonical_head, load_model
 from .evaluate import decode, f1, metrics, predict, with_temperature
 
 
@@ -93,9 +93,9 @@ def main():
     ap.add_argument("--W", type=int, default=32)
     ap.add_argument("--out", required=True)
     ap.add_argument("--name_only", action="store_true")
-    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
+    ap.add_argument("--head", default="bce", type=canonical_head, choices=["bce", "calon"])
     ap.add_argument("--decode", default="label", choices=["label", "entity"],
-                    help="RLCD: threshold the chosen label's probability or 1 - p(none)")
+                    help="CalOn: threshold the chosen label's probability or 1 - p(none)")
     args = ap.parse_args()
     cal = json.loads(Path(args.calibration).read_text())
     T = cal["temperature"]
@@ -121,8 +121,8 @@ def main():
         seen = set(info["seen_labels"])
         r = {}
         for key, (t, thr) in settings.items():
-            # RLCD rescales utilities before its softmax; BCE divides logits by t
-            o_t, t = ((with_temperature(outs, t, args.decode), 1.0) if args.head == "rlcd"
+            # CalOn rescales utilities before its softmax; BCE divides logits by t
+            o_t, t = ((with_temperature(outs, t, args.decode), 1.0) if args.head == "calon"
                       else (outs, t))
             m = metrics(encs, o_t, t, thr)
             counts, absent = per_query(encs, o_t, t, thr)

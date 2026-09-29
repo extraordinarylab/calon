@@ -19,18 +19,18 @@ S=/scratch/u6sn/yangw.u6sn/ie-rlcd/synth
 step() { echo "== $1 $(date +%T)"; }
 
 conda activate ie-rlcd
-[ -s $S/a1_requests.jsonl ] || { step prepare_a; python -m ierlcd.synth.llm_annotate prepare-a --n 100000 2>&1 | tail -2 | cut -c1-600; }
-[ -s $S/c_requests.jsonl ] || { step prepare_c; python -m ierlcd.synth.llm_annotate prepare-c --per-domain 1000 2>&1 | tail -2; }
+[ -s $S/a1_requests.jsonl ] || { step prepare_a; python -m calon.synth.llm_annotate prepare-a --n 100000 2>&1 | tail -2 | cut -c1-600; }
+[ -s $S/c_requests.jsonl ] || { step prepare_c; python -m calon.synth.llm_annotate prepare-c --per-domain 1000 2>&1 | tail -2; }
 conda activate ie-rlcd-vllm
 export HF_HUB_OFFLINE=1
-step run_a1; python -m ierlcd.synth.llm_annotate run --task a1 --limit 300 --chunk 300 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
-step run_c;  python -m ierlcd.synth.llm_annotate run --task c --limit 100 --chunk 100 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
+step run_a1; python -m calon.synth.llm_annotate run --task a1 --limit 300 --chunk 300 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
+step run_c;  python -m calon.synth.llm_annotate run --task c --limit 100 --chunk 100 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
 conda activate ie-rlcd
-step prepare_a2; python -m ierlcd.synth.llm_annotate prepare-a2 --min-type-count 1 2>&1 | tail -1
+step prepare_a2; python -m calon.synth.llm_annotate prepare-a2 --min-type-count 1 2>&1 | tail -1
 conda activate ie-rlcd-vllm
-step run_a2; python -m ierlcd.synth.llm_annotate run --task a2 --limit 300 --chunk 300 --max-tokens 768 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
+step run_a2; python -m calon.synth.llm_annotate run --task a2 --limit 300 --chunk 300 --max-tokens 768 2>&1 | grep -E "^shard|^chunk|Error" | cut -c1-200
 conda activate ie-rlcd
-step assemble; python -m ierlcd.synth.llm_annotate assemble 2>&1 | grep -E '"(rows|entities|stats|a1_|a2_|c_|synth)' | head -30
+step assemble; python -m calon.synth.llm_annotate assemble 2>&1 | grep -E '"(rows|entities|stats|a1_|a2_|c_|synth)' | head -30
 step examples
 python - <<'PY'
 import json

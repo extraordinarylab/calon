@@ -15,5 +15,5 @@ cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 TASK=${TASK:?}; NSHARDS=${NSHARDS:?}
 EXTRA=""; [ "$TASK" = a2 ] && EXTRA="--max-tokens 768"
-python -m ierlcd.synth.llm_annotate run --task $TASK --shard $SLURM_ARRAY_TASK_ID --num-shards $NSHARDS \
+python -m calon.synth.llm_annotate run --task $TASK --shard $SLURM_ARRAY_TASK_ID --num-shards $NSHARDS \
   --chunk 2048 $EXTRA 2>&1 | grep -E "^shard|^chunk|Error|error" | cut -c1-200

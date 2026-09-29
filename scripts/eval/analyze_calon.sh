@@ -12,5 +12,5 @@ source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src
-python -m tools.analyze_rlcd > /scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/rlcd-analysis.txt 2>&1
+python -m tools.analyze_calon > /scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/rlcd-analysis.txt 2>&1
 wc -l /scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/rlcd-analysis.txt

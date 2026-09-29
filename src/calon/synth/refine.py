@@ -2,10 +2,10 @@
 
 1. prepare-ra   A second, non-Qwen model re-annotates every train row of the
                 synthetic sources with the same types (task "ra", A2 prompt).
-2. flag_rlcd.py Our RLCD model marks spans it is confident about that the Qwen
+2. flag_calon.py Our CalOn model marks spans it is confident about that the Qwen
                 labels lack (p(entity) >= 0.9), and Qwen spans it doubts.
 3. prepare-jd   Every disputed span (found by only one of Qwen / the re-annotator,
-                or flagged by RLCD) goes to a third model, which answers yes / no
+                or flagged by CalOn) goes to a third model, which answers yes / no
                 per span (task "jd").
 4. apply        Keep spans both Qwen and the re-annotator found, plus disputed
                 spans the judge accepts. A type left without spans becomes
@@ -126,7 +126,7 @@ def disputes(args, stats=None):
             stats[f"{src}_agreed"] += len(agreed)
             stats[f"{src}_qwen_only"] += len(q - g)
             stats[f"{src}_second_only"] += len(g - q)
-            stats[f"{src}_rlcd_extra_new"] += len(extra - q - g)
+            stats[f"{src}_calon_extra_new"] += len(extra - q - g)
             yield src, r, agreed, disputed
 
 

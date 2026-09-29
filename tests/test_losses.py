@@ -5,7 +5,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from ierlcd.model.losses import loss_fn
+from calon.model.losses import loss_fn
 
 
 def batch(B=3, M=4, C=7, seed=0):
@@ -120,7 +120,7 @@ def test_pg_and_direct_match_finite_difference(z0, y):
 
 @pytest.mark.parametrize("z0,y", [(-1.0, 1.0), (0.7, 0.0)])
 def test_spherical_pg_and_direct_match_finite_difference(z0, y):
-    from ierlcd.model.losses import spherical_term
+    from calon.model.losses import spherical_term
     sigma, K, n, alpha = 0.5, 8, 20000, 0.1
     eps = torch.randn(200001, generator=torch.Generator().manual_seed(11), dtype=torch.float64)
     def J(zz):
@@ -143,7 +143,7 @@ def test_spherical_pg_and_direct_match_finite_difference(z0, y):
 
 
 def test_spherical_term_is_zero_at_certainty_and_proper():
-    from ierlcd.model.losses import spherical_term
+    from calon.model.losses import spherical_term
     big = torch.tensor([30.0, -30.0], dtype=torch.float64)
     assert torch.allclose(spherical_term(big, torch.tensor([1.0, 0.0], dtype=torch.float64)),
                           torch.zeros(2, dtype=torch.float64), atol=1e-9)

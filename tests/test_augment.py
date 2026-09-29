@@ -1,7 +1,7 @@
 """Label anonymization keeps queries and gold entities consistent."""
 import random
 
-from ierlcd.data.mixdata import anonymize_labels
+from calon.data.mixdata import anonymize_labels
 
 
 def test_anonymize_labels():

@@ -52,8 +52,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
-    models = {"RLCD (ours, desc)": ours("rlcd-w0.1-f1-ent", "desc"),
-              "RLCD (ours, name)": ours("rlcd-w0.1-f1-ent", "name_only"),
+    models = {"CalOn (ours, desc)": ours("rlcd-w0.1-f1-ent", "desc"),
+              "CalOn (ours, name)": ours("rlcd-w0.1-f1-ent", "name_only"),
               "BCE (ours, desc)": ours("bce-f1", "desc")}
     for m in ["gliner2-base-v1", "gliner2-large-v1"]:
         for v in ["desc", "name_only"]:

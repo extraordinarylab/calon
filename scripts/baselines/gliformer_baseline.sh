@@ -28,7 +28,7 @@ for M in knowledgator/gliformer-base-v1 knowledgator/gliformer-large-v1; do
   for V in name_only desc; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
     N=$(basename $M)-$V
-    python -m ierlcd.baselines.gliner2_eval --backend gliformer --ood $ROOT/data/ood --model $M $FLAG \
+    python -m calon.baselines.gliner2_eval --backend gliformer --ood $ROOT/data/ood --model $M $FLAG \
       --out $OUT/$N.json > $OUT/$N.log 2>&1 || { echo "FAILED $N: $(tail -2 $OUT/$N.log | cut -c1-200)"; continue; }
     echo "$N $(tail -1 $OUT/$N.log | cut -c1-200)"
   done

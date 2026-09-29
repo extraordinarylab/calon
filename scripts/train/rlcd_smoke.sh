@@ -22,12 +22,12 @@ python -m pytest -q tests 2>&1 | tail -2
 for ENC in answerdotai/ModernBERT-base /scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen2.5-0.5B; do
   OUT=$ROOT/runs/rlcd-smoke/$(basename $ENC); rm -rf $OUT
   echo "== $ENC"
-  python -m ierlcd.train.train --data $MIX --out $OUT --mix $SPEC --encoder $ENC --head rlcd \
+  python -m calon.train.train --data $MIX --out $OUT --mix $SPEC --encoder $ENC --head rlcd \
     --fewnerd_fine_only --updates 200 --eval_every 200 --eval_limit 200 --workers 16 2>&1 \
     | grep -E "EVAL|done|Error|error" | cut -c1-250
   grep '"step": 200' $OUT/log.jsonl | cut -c1-250
-  python -m ierlcd.train.calibrate --data $MIX --sources $SRC --encoder $ENC --head rlcd --fewnerd_fine_only \
+  python -m calon.train.calibrate --data $MIX --sources $SRC --encoder $ENC --head rlcd --fewnerd_fine_only \
     --ckpt $OUT/final.pt --limit 200 --out $OUT/calibration.json 2>&1 | grep -vE "filter_long" | tail -7
-  python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENC --head rlcd --ckpt $OUT/final.pt \
+  python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENC --head rlcd --ckpt $OUT/final.pt \
     --calibration $OUT/calibration.json --out $OUT/ood.json 2>&1 | grep -E "macro_f1_all|Error" | cut -c1-200
 done

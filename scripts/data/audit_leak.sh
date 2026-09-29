@@ -13,4 +13,4 @@ source /lus/lfs1aip2/scratch/u6sn/yangw.u6sn/miniforge3/etc/profile.d/conda.sh
 conda activate ie-rlcd
 cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_DISABLE_XET=1
-python -m ierlcd.data.audit_leak 2>&1 | cut -c1-300
+python -m calon.data.audit_leak 2>&1 | cut -c1-300

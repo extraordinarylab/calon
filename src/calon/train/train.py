@@ -32,8 +32,8 @@ from ..data.mixdata import (
     step_schedule,
 )
 from ..eval.evaluate import f1, f1_counts, metrics, predict, with_temperature
-from ..model.losses import loss_fn, rlcd_loss
-from ..model.model import SpanLabelModel
+from ..model.losses import calon_loss, loss_fn
+from ..model.model import SpanLabelModel, canonical_head
 
 
 def param_groups(model, enc_lr, head_lr, wd):
@@ -61,12 +61,12 @@ def best_threshold_f1(encs, outs):
 
 def evaluate_sources(model, dev, collate, device, head="bce"):
     """Checkpoint selection, identical for both heads: each source's dev F1 at
-    its best threshold, with the decision rule the head is used with (RLCD:
-    entity-level decoding). Round 1-3 selected RLCD with label decoding at 0.5."""
+    its best threshold, with the decision rule the head is used with (CalOn:
+    entity-level decoding). Round 1-3 selected CalOn with label decoding at 0.5."""
     res = {}
     for src, encs in dev.items():
         outs = predict(model, encs, collate, device, batch_size=16)
-        if head == "rlcd":
+        if head == "calon":
             outs = with_temperature(outs, 1.0, "entity")
         res[src] = metrics(encs, outs)
         res[src]["f1_at_0.5"] = res[src]["f1"]
@@ -93,11 +93,11 @@ def main():
     ap.add_argument("--lam", type=float, default=0.1)
     ap.add_argument("--lam_ramp", type=int, default=200)
     ap.add_argument("--alpha", type=float, default=0.0, help="spherical-score weight (appendix A)")
-    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"],
-                    help="rlcd: per-span choice over [none, labels], Plackett-Luce + Brier")
+    ap.add_argument("--head", default="bce", type=canonical_head, choices=["bce", "calon"],
+                    help="calon: per-span choice over [none, labels], Plackett-Luce + Brier")
     ap.add_argument("--brier_weight", type=float, default=1.0)
     ap.add_argument("--none_weight", type=float, default=1.0,
-                    help="RLCD: loss weight of spans whose answer is 'not an entity'")
+                    help="CalOn: loss weight of spans whose answer is 'not an entity'")
     ap.add_argument("--fewnerd_fine_only", action="store_true", help="same as --fewnerd_mode fine")
     ap.add_argument("--fewnerd_mode", default="both", choices=["both", "fine", "precedence"])
     ap.add_argument("--desc_dropout", type=float, default=0.0,
@@ -201,8 +201,8 @@ def main():
                     (z.float().sum() * 0).backward()
                     continue
                 stats = {}
-                if args.head == "rlcd":
-                    loss = rlcd_loss(z, tgt["y"].to(device), tgt["valid"].to(device),
+                if args.head == "calon":
+                    loss = calon_loss(z, tgt["y"].to(device), tgt["valid"].to(device),
                                      tgt["query_mask"].to(device), tgt["cand_mask"].to(device),
                                      brier_weight=args.brier_weight, stats=stats,
                                      none_weight=args.none_weight)
@@ -215,7 +215,7 @@ def main():
             for k, v in stats.items():
                 stats_acc[k] = stats_acc.get(k, 0.0) + v * n_act / n_total
         if world > 1:                           # logged stats: sum of every rank's share
-            keys = ("clean_bce", "mean_reward", "auxiliary", "rlcd_ce", "rlcd_brier")
+            keys = ("clean_bce", "mean_reward", "auxiliary", "calon_ce", "calon_brier")
             t = torch.tensor([stats_acc.get(k, 0.0) for k in keys], device=device)
             dist.all_reduce(t)
             stats_acc = {k: v for k, v in zip(keys, t.tolist()) if k in stats_acc}

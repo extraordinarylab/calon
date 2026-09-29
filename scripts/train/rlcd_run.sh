@@ -23,14 +23,14 @@ RUNS=$ROOT/runs/$EXP-s$SEED
 NAME=$HEAD-12k
 mkdir -p $RUNS
 git rev-parse HEAD > $RUNS/git_commit.txt
-torchrun --standalone --nproc_per_node=4 -m ierlcd.train.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
+torchrun --standalone --nproc_per_node=4 -m calon.train.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
   --encoder $ENCODER --head $HEAD --fewnerd_fine_only --mode bce --updates $UPDATES \
   --eval_every 1000 --workers 12 --seed $SEED > $RUNS/$NAME.log 2>&1
 grep -E "EVAL|done" $RUNS/$NAME.log | tail -3 | cut -c1-250
-python -m ierlcd.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD \
+python -m calon.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD \
   --fewnerd_fine_only --ckpt $RUNS/$NAME/best.pt --out $RUNS/$NAME/calibration.json \
   > $RUNS/$NAME-calib.log 2>&1
-python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD \
+python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD \
   --ckpt $RUNS/$NAME/best.pt --calibration $RUNS/$NAME/calibration.json \
   --out $RUNS/$NAME/ood.json > $RUNS/$NAME-ood.log 2>&1
 echo "===== $EXP s$SEED $NAME DONE ====="

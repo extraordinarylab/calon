@@ -8,11 +8,11 @@ import torch.nn.functional as F
 def predict(model, encs, collate, device, batch_size=32):
     """Run the model; return per-row arrays of logits over supervised decisions.
 
-    For an RLCD head the row also keeps the raw utilities `u` ([1+M, C], none
+    For an CalOn head the row also keeps the raw utilities `u` ([1+M, C], none
     first) and `known` ([M]), and `z` / `choice` come from with_temperature(T=1).
     """
     model.eval()
-    rlcd = getattr(model, "head_type", "bce") == "rlcd"
+    calon = getattr(model, "head_type", "bce") == "calon"
     out = []
     for k in range(0, len(encs), batch_size):
         chunk = encs[k:k + batch_size]
@@ -22,7 +22,7 @@ def predict(model, encs, collate, device, batch_size=32):
         for b, e in enumerate(chunk):
             M, C = len(e["labels"]), len(e["cands"])
             o = {"y": tgt["y"][b, :M, :C].numpy(), "valid": tgt["valid"][b, :M, :C].numpy()}
-            if rlcd:
+            if calon:
                 o["u"] = z[b, :1 + M, :C].numpy()
                 o["known"] = o["valid"].any(-1) if C else np.zeros(M, bool)
                 o["unknown_row"] = bool((np.array(e["supervised"]) == False).any())  # noqa: E712
@@ -30,10 +30,10 @@ def predict(model, encs, collate, device, batch_size=32):
                 o["z"] = z[b, :M, :C].numpy()
             out.append(o)
     model.train()
-    return with_temperature(out, 1.0) if rlcd else out
+    return with_temperature(out, 1.0) if calon else out
 
 
-def rlcd_probs(o, T):
+def calon_probs(o, T):
     """Softmax over [none, known labels] of u / T -> [1+M, C]."""
     u = o["u"] / T
     ok = np.concatenate([[True], o["known"]])[:, None]
@@ -44,7 +44,7 @@ def rlcd_probs(o, T):
 
 
 def with_temperature(outs, T, decode="label"):
-    """RLCD rows -> binary-decision view: z = logit(p_label), choice = the span's
+    """CalOn rows -> binary-decision view: z = logit(p_label), choice = the span's
     most likely label. Decoding keeps a label only where choice is set and the
     decision score `dz` clears the threshold:
       label   dz = logit(p_label)       (the chosen label's own probability)
@@ -53,7 +53,7 @@ def with_temperature(outs, T, decode="label"):
               between near-synonymous labels no longer suppresses the span)"""
     res = []
     for o in outs:
-        p = rlcd_probs(o, T)
+        p = calon_probs(o, T)
         pl = np.clip(p[1:], 1e-12, 1 - 1e-12)
         choice = np.zeros_like(pl, dtype=bool)
         if pl.size:
@@ -69,13 +69,13 @@ def with_temperature(outs, T, decode="label"):
     return res
 
 
-def rlcd_brier(outs, T):
-    """Mean multiway Brier over spans (the RLCD loss's targets and masking)."""
+def calon_brier(outs, T):
+    """Mean multiway Brier over spans (the CalOn loss's targets and masking)."""
     tot, n = 0.0, 0
     for o in outs:
         if not o["u"].size:
             continue
-        p = rlcd_probs(o, T)
+        p = calon_probs(o, T)
         gold = (o["y"] > 0) & o["valid"]
         has = gold.any(0)
         ok = has | (not o["unknown_row"])
@@ -151,8 +151,8 @@ def metrics(encs, outs, temperature=1.0, threshold=0.5):
         torch.from_numpy(o["y"][o["valid"]])).item() for o in outs if o["valid"].any()]
     prob = 1 / (1 + np.exp(-zs))
     pred = prob >= threshold
-    rlcd = bool(outs) and "choice" in outs[0]
-    if rlcd:                                  # only the span's chosen label is a prediction
+    calon = bool(outs) and "choice" in outs[0]
+    if calon:                                  # only the span's chosen label is a prediction
         dz = np.concatenate([o["dz"][o["valid"]] for o in outs])
         pred = (dz >= thr_logit) & np.concatenate([o["choice"][o["valid"]] for o in outs])
     gold = sum(len(e["gold_spans"]) for e in encs)
@@ -168,7 +168,7 @@ def metrics(encs, outs, temperature=1.0, threshold=0.5):
         "candidate_recall": 1 - sum(e["unrepresented"] for e in encs) / max(gold, 1),
         "temperature": temperature, "threshold": threshold,
     })
-    if rlcd:
-        res["brier_multiway"] = float(rlcd_brier(outs, outs[0]["T"]))
+    if calon:
+        res["brier_multiway"] = float(calon_brier(outs, outs[0]["T"]))
         res["temperature"] = outs[0]["T"]
     return res

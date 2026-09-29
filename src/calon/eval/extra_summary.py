@@ -1,5 +1,5 @@
 """Table for a separate evaluation directory (spy / new): our 5-seed round-4 finals
-(RLCD entity decoding, BCE) and the baselines, per set: F1, precision, recall,
+(CalOn entity decoding, BCE) and the baselines, per set: F1, precision, recall,
 absent-query FPR, entity miss rate."""
 import argparse
 import json

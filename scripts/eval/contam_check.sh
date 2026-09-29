@@ -20,7 +20,7 @@ ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 HFM=/scratch/u6sn/yangw.u6sn/huggingface_models
 conda activate ie-rlcd
 for SP in train validation; do
-  python -m ierlcd.data.prepare_ood --train $ROOT/data/mix/finerweb/train.jsonl --out $ROOT/data/ood_split_$SP \
+  python -m calon.data.prepare_ood --train $ROOT/data/mix/finerweb/train.jsonl --out $ROOT/data/ood_split_$SP \
     --split $SP --max_rows 2000 > $TMPDIR/prep-$SP.log 2>&1
   grep -E '"rows"' $TMPDIR/prep-$SP.log | tr -s ' ' | tr '\n' ' '; echo " <- $SP"
 done
@@ -29,26 +29,26 @@ OUT=$ROOT/runs2/contam; mkdir -p $OUT
   conda activate $CONDA/envs/gliner2
   for SP in train validation; do for M in fastino/gliner2-base-v1 fastino/gliner2-large-v1; do for V in desc name_only; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
-    CUDA_VISIBLE_DEVICES=0 python -m ierlcd.baselines.gliner2_eval --ood $ROOT/data/ood_split_$SP --model $M $FLAG \
+    CUDA_VISIBLE_DEVICES=0 python -m calon.baselines.gliner2_eval --ood $ROOT/data/ood_split_$SP --model $M $FLAG \
       --out $OUT/$SP-$(basename $M)-$V.json > $OUT/$SP-$(basename $M)-$V.log 2>&1 || echo "FAILED $SP $M $V"
   done; done; done ) &
 (   # GPU 1: gliformer, then GNER
   conda activate $CONDA/envs/gliformer
   for SP in train validation; do for M in knowledgator/gliformer-base-v1 knowledgator/gliformer-large-v1; do
-    CUDA_VISIBLE_DEVICES=1 python -m ierlcd.baselines.gliner2_eval --backend gliformer --name_only --ood $ROOT/data/ood_split_$SP \
+    CUDA_VISIBLE_DEVICES=1 python -m calon.baselines.gliner2_eval --backend gliformer --name_only --ood $ROOT/data/ood_split_$SP \
       --model $M --out $OUT/$SP-$(basename $M)-name_only.json > $OUT/$SP-$(basename $M)-name_only.log 2>&1 || echo "FAILED $SP $M"
   done; done
   conda activate ie-rlcd-vllm
   for SP in train validation; do
     SETS=$(ls $ROOT/data/ood_split_$SP/*.jsonl | xargs -n1 basename | sed 's/.jsonl$//' | tr '\n' ' ')
-    CUDA_VISIBLE_DEVICES=1 python -m ierlcd.baselines.llm_ner_eval --backend gner --model $HFM/dyyyyyyyy/GNER-LLaMA-7B \
+    CUDA_VISIBLE_DEVICES=1 python -m calon.baselines.llm_ner_eval --backend gner --model $HFM/dyyyyyyyy/GNER-LLaMA-7B \
       --ood $ROOT/data/ood_split_$SP --sets $SETS --out_dir $OUT/$SP-GNER-LLaMA-7B > $OUT/$SP-gner.log 2>&1 || echo "FAILED GNER $SP"
   done ) &
 (   # GPU 2: InstructUIE (positive control)
   conda activate ie-rlcd
   for SP in train validation; do
     SETS=$(ls $ROOT/data/ood_split_$SP/*.jsonl | xargs -n1 basename | sed 's/.jsonl$//' | tr '\n' ' ')
-    CUDA_VISIBLE_DEVICES=2 python -m ierlcd.baselines.instructuie_eval --ood $ROOT/data/ood_split_$SP --model $HFM/ZWK/InstructUIE \
+    CUDA_VISIBLE_DEVICES=2 python -m calon.baselines.instructuie_eval --ood $ROOT/data/ood_split_$SP --model $HFM/ZWK/InstructUIE \
       --sets $SETS --out_dir $OUT/$SP-InstructUIE > $OUT/$SP-instructuie.log 2>&1 || echo "FAILED InstructUIE $SP"
   done ) &
 (   # GPU 3: our round-4 finals, seeds 42 and 43
@@ -60,7 +60,7 @@ OUT=$ROOT/runs2/contam; mkdir -p $OUT
       set -- $arm
       for V in desc name_only; do
         FLAG=""; [ $V = name_only ] && FLAG=--name_only
-        CUDA_VISIBLE_DEVICES=3 python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood_split_$SP --encoder $ENC --head $1 \
+        CUDA_VISIBLE_DEVICES=3 python -m calon.eval.ood_eval --ood $ROOT/data/ood_split_$SP --encoder $ENC --head $1 \
           --decode $4 $FLAG --ckpt $R/$2/best.pt --calibration $R/$3/calibration.json \
           --out $OUT/$SP-$3-s$S-$V.json > $OUT/$SP-$3-s$S-$V.log 2>&1 || echo "FAILED $SP $3 s$S $V"
       done
@@ -68,4 +68,4 @@ OUT=$ROOT/runs2/contam; mkdir -p $OUT
   done; done ) &
 wait
 conda activate ie-rlcd
-python -m ierlcd.eval.contam_summary --out $OUT/summary.txt && cat $OUT/summary.txt
+python -m calon.eval.contam_summary --out $OUT/summary.txt && cat $OUT/summary.txt

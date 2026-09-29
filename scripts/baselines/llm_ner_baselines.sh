@@ -36,9 +36,9 @@ g=0
 for mb in "${MODELS[@]}"; do
   b=${mb%%:*}; id=${mb#*:}; OUT=$ROOT/runs2/llm-ner/$(basename $id); mkdir -p $OUT
   ls $HFM/$id > $OUT/files.txt
-  ( CUDA_VISIBLE_DEVICES=$g python -m ierlcd.baselines.llm_ner_eval --backend $b --model $HFM/$id --ood $ROOT/data/ood \
+  ( CUDA_VISIBLE_DEVICES=$g python -m calon.baselines.llm_ner_eval --backend $b --model $HFM/$id --ood $ROOT/data/ood \
       --sets $OOD --out_dir $OUT > $OUT/ood.log 2>&1
-    CUDA_VISIBLE_DEVICES=$g python -m ierlcd.baselines.llm_ner_eval --backend $b --model $HFM/$id --ood $ROOT/data/ood_pii \
+    CUDA_VISIBLE_DEVICES=$g python -m calon.baselines.llm_ner_eval --backend $b --model $HFM/$id --ood $ROOT/data/ood_pii \
       --sets pii_ai4privacy --out_dir $OUT > $OUT/pii.log 2>&1 ) &
   g=$((g + 1))
 done

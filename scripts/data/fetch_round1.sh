@@ -15,6 +15,6 @@ cd /home/u6sn/yangw.u6sn/workspace/ie-rlcd
 export PYTHONPATH=src HF_HUB_DISABLE_XET=1
 RAW=/scratch/u6sn/yangw.u6sn/ie-rlcd/raw
 mkdir -p $RAW
-python -m ierlcd.data.fetch_sources --out $RAW
+python -m calon.data.fetch_sources --out $RAW
 du -sh $RAW/* > $RAW/sizes.txt
 echo "===== FETCH DONE ====="

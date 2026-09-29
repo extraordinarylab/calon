@@ -22,7 +22,7 @@ for M in ${MODELS:-fastino/gliner2-base-v1 fastino/gliner2-large-v1 fastino/glin
   for V in desc name_only; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
     N=$(basename $M)-$V
-    python -m ierlcd.baselines.gliner2_eval --ood $ROOT/data/ood --model $M $FLAG --out $OUT/$N.json \
+    python -m calon.baselines.gliner2_eval --ood $ROOT/data/ood --model $M $FLAG --out $OUT/$N.json \
       > $OUT/$N.log 2>&1 || { echo "FAILED $N"; tail -5 $OUT/$N.log | cut -c1-200; continue; }
     echo "$N $(tail -1 $OUT/$N.log | cut -c1-200)"
   done

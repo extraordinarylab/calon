@@ -14,8 +14,8 @@ from transformers import AutoTokenizer
 
 from ..data.collator import Collator, add_control_tokens
 from ..data.mixdata import fewnerd_transform
-from ..eval.evaluate import f1, f1_counts, metrics, predict, reliability, rlcd_brier, with_temperature
-from ..model.model import load_model
+from ..eval.evaluate import calon_brier, f1, f1_counts, metrics, predict, reliability, with_temperature
+from ..model.model import canonical_head, load_model
 from .train import encode_split
 
 
@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--encoder", default="answerdotai/ModernBERT-base")
     ap.add_argument("--W", type=int, default=32)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--head", default="bce", choices=["bce", "rlcd"])
+    ap.add_argument("--head", default="bce", type=canonical_head, choices=["bce", "calon"])
     ap.add_argument("--fewnerd_fine_only", action="store_true")
     ap.add_argument("--fewnerd_mode", default="both", choices=["both", "fine", "precedence"])
     ap.add_argument("--decode", default="label", choices=["label", "entity"])
@@ -59,7 +59,7 @@ def main():
     collate = Collator(tok, lab_id, txt_id)
     model = load_model(args.encoder, len(tok), args.W, args.head, args.ckpt)
     sources = args.sources.split(",")
-    rlcd = args.head == "rlcd"
+    calon = args.head == "calon"
     if args.fewnerd_fine_only:
         args.fewnerd_mode = "fine"
     fewnerd_tf = fewnerd_transform(args.data, args.fewnerd_mode)
@@ -76,12 +76,12 @@ def main():
     pool_o = [x for src in sources for x in outs[("dev_calib", src)]]
 
     def view(o, T):
-        """(rows, divisor) for metrics: RLCD rescales utilities before the softmax."""
-        return (with_temperature(o, T, args.decode), 1.0) if rlcd else (o, T)
+        """(rows, divisor) for metrics: CalOn rescales utilities before the softmax."""
+        return (with_temperature(o, T, args.decode), 1.0) if calon else (o, T)
 
-    if rlcd:   # RLCD: temperature minimizing multiway Brier on dev_calib (the blog's recipe)
+    if calon:   # CalOn: temperature minimizing multiway Brier on dev_calib (the blog's recipe)
         grid = np.exp(np.linspace(np.log(0.25), np.log(4.0), 57))
-        T = float(min(grid, key=lambda t: rlcd_brier(pool_o, t)))
+        T = float(min(grid, key=lambda t: calon_brier(pool_o, t)))
     else:
         T = fit_temperature(pool_o)
     thr_raw = best_threshold(pool_e, *view(pool_o, 1.0))
@@ -106,7 +106,7 @@ def main():
         res[f"test_reliability_{name}_all"] = reliability(p, yt)
         thr = thr_raw if name == "raw" else thr_cal
         sel = p >= thr
-        if rlcd:
+        if calon:
             dz = np.concatenate([o["dz"][o["valid"]] for o in rows])
             sel = (1 / (1 + np.exp(-dz)) >= thr) & np.concatenate([o["choice"][o["valid"]] for o in rows])
         res[f"test_reliability_{name}_predicted"] = reliability(p[sel], yt[sel])

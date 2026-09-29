@@ -1,4 +1,4 @@
-"""Why MIT Movie / Restaurant are weak: per-label F1 of our RLCD vs BCE vs gliformer,
+"""Why MIT Movie / Restaurant are weak: per-label F1 of our CalOn vs BCE vs gliformer,
 error types, and how MIT mentions differ from training mentions (length, case)."""
 import json
 import sys
@@ -10,7 +10,7 @@ import numpy as np
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 KEY = "calibrated@fw_tuned"
 SETS = ["mit_movie", "mit_restaurant"]
-OURS = {"rlcd": "rlcd-w0.1-ent", "bce": "bce-u6000"}
+OURS = {"calon": "rlcd-w0.1-ent", "bce": "bce-u6000"}
 
 
 def rows(p, limit=None):
@@ -48,8 +48,8 @@ def main():
                     o = json.loads((runs / f"p1-z3-s{seed}/{arm}/ood-{mode}.json").read_text())["sets"][s][KEY]
                     for lab, v in o["per_label"].items():
                         vals[lab].append(v)
-                    if name == "rlcd" and mode == "desc" and seed == 42:
-                        print(f"== {s} RLCD error types (seed 42, with descriptions):", json.dumps(o["errors"]))
+                    if name == "calon" and mode == "desc" and seed == 42:
+                        print(f"== {s} CalOn error types (seed 42, with descriptions):", json.dumps(o["errors"]))
                 for lab, v in vals.items():
                     keys = ("precision", "recall", "f1")
                     per[lab][f"{name}-{mode}"] = tuple(np.mean([x[k] for x in v]) for k in keys)

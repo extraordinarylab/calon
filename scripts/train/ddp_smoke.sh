@@ -14,8 +14,8 @@ export PYTHONPATH=src HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 OUT=$ROOT/runs/ddp-smoke
 rm -rf $OUT
-torchrun --standalone --nproc_per_node=4 -m ierlcd.train.train --data $ROOT/data/mix --out $OUT/ddp4 \
+torchrun --standalone --nproc_per_node=4 -m calon.train.train --data $ROOT/data/mix --out $OUT/ddp4 \
   --updates 100 --eval_every 100 --eval_limit 100 --workers 12 2>&1 | grep -E "world|EVAL|done|Error" | cut -c1-300
-python -m ierlcd.train.train --data $ROOT/data/mix --out $OUT/gpu1 --updates 100 --eval_every 100 \
+python -m calon.train.train --data $ROOT/data/mix --out $OUT/gpu1 --updates 100 --eval_every 100 \
   --eval_limit 100 --workers 12 2>&1 | grep -E "world|EVAL|done|Error" | cut -c1-300
 for d in ddp4 gpu1; do echo "$d $(grep '"step": 100' $OUT/$d/log.jsonl | cut -c1-220)"; done

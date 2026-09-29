@@ -20,7 +20,7 @@ OUT=$ROOT/runs2/mn-smoke; rm -rf $OUT
 MASTER=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -1)
 srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p \$TMPDIR; \
   torchrun --nnodes=$SLURM_NNODES --nproc_per_node=4 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d \
-  --rdzv_endpoint=$MASTER:29500 -m ierlcd.train.train --data $ROOT/data/mix2 --out $OUT \
+  --rdzv_endpoint=$MASTER:29500 -m calon.train.train --data $ROOT/data/mix2 --out $OUT \
   --mix finerweb:0.25,fewnerd:0.30,pile:0.30,massive:0.15 \
   --encoder /scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3-0.6B --head rlcd --fewnerd_fine_only \
   --desc_dropout 0.3 --batch 128 --micro 8 --updates 60 --enc_lr 4e-5 --head_lr 2e-4 --eval_every 60 \

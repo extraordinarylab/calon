@@ -25,6 +25,11 @@ def mlp(d_in, hidden, d_out, dropout):
 HEAD_KEYS = ("hidden", "out", "label_pool", "head_layers", "head_heads")
 
 
+def canonical_head(head):
+    """Head name; "rlcd" is the name used before the method was called CalOn."""
+    return "calon" if head == "rlcd" else head
+
+
 def load_model(encoder, vocab_size, W, head, ckpt, device="cuda"):
     """Rebuild a trained model; head options come from model_config.json next to the
     checkpoint (absent for older runs, which used the defaults)."""
@@ -49,6 +54,7 @@ class SpanLabelModel(nn.Module):
                  dropout=0.1, attn_implementation=None, head="bce", label_pool="mean",
                  head_layers=0, head_heads=16):
         super().__init__()
+        head = canonical_head(head)
         self.head_type = head
         # label vector from the name+description tokens ("mean"), from the <LABEL>
         # marker's hidden state ("marker", as GLiNER2 / GLiFormer do), or both concatenated
@@ -77,7 +83,7 @@ class SpanLabelModel(nn.Module):
         self.label_mlp = mlp(2 * d if label_pool == "both" else d, hidden, out, dropout)
         self.bias = nn.Parameter(torch.zeros(()))
         self.scale = 1 / math.sqrt(out)
-        if head == "rlcd":
+        if head == "calon":
             # the "not an entity" candidate: a learned key in label space, so its
             # utility u_none = <span, none> / sqrt(r) depends on the span like any label
             self.none_key = nn.Parameter(torch.randn(out) * 0.02)
@@ -126,8 +132,8 @@ class SpanLabelModel(nn.Module):
         s = self.span_mlp(span)                                         # [B,C,O]
         l = self.label_mlp(lab)                                         # [B,M,O]
         z = torch.einsum("bmo,bco->bmc", l, s) * self.scale + self.bias
-        if self.head_type != "rlcd":
+        if self.head_type != "calon":
             return z                                                    # [B,M,C] logits
-        # RLCD: utilities for [none, label_1..label_M] per span -> [B,1+M,C]
+        # CalOn: utilities for [none, label_1..label_M] per span -> [B,1+M,C]
         u_none = torch.einsum("o,bco->bc", self.none_key, s)[:, None, :] * self.scale
         return torch.cat([u_none, z], 1)

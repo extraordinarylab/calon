@@ -18,7 +18,7 @@ ENC=/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3-0.6B
 CKPT=${CKPT:-/scratch/u6sn/yangw.u6sn/ie-rlcd/runs2/p2-z4-s42/rlcd-w0.1-f1/best.pt}
 for g in 0 1 2 3; do
   S=$((4 * SLURM_ARRAY_TASK_ID + g))
-  CUDA_VISIBLE_DEVICES=$g python -m ierlcd.synth.flag_rlcd --encoder $ENC --ckpt $CKPT --shard $S --num-shards $NSHARDS \
+  CUDA_VISIBLE_DEVICES=$g python -m calon.synth.flag_calon --encoder $ENC --ckpt $CKPT --shard $S --num-shards $NSHARDS \
     > $TMPDIR/flag-$S.log 2>&1 &
 done
 wait

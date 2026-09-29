@@ -29,7 +29,7 @@ i=0
 for j in "${JOBS[@]}"; do
   read NAME FILE VARIANT <<< "$j"
   FLAG=""; [ "$VARIANT" = name_only ] && FLAG=--name_only
-  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m ierlcd.eval.ood_eval --ood $OOD --ckpt $RUNS/$NAME/$FILE \
+  CUDA_VISIBLE_DEVICES=$((i % 4)) python -m calon.eval.ood_eval --ood $OOD --ckpt $RUNS/$NAME/$FILE \
     --calibration $RUNS/$NAME/calibration.json --out $RUNS/$NAME/ood-$VARIANT.json $FLAG \
     > $RUNS/$NAME-ood-$VARIANT.log 2>&1 &
   i=$((i + 1))

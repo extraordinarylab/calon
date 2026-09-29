@@ -24,11 +24,11 @@ OUT=$ROOT/runs2/instructuie; mkdir -p $OUT
 SETG=("mit_movie" "crossner_politics crossner_science mit_restaurant" "crossner_ai crossner_literature crossner_music" "pii_ai4privacy")
 for g in 0 1 2 3; do
   D=$ROOT/data/ood; [ "${SETG[$g]}" = pii_ai4privacy ] && D=$ROOT/data/ood_pii
-  CUDA_VISIBLE_DEVICES=$g python -m ierlcd.baselines.instructuie_eval --ood $D --model $M --sets ${SETG[$g]} \
+  CUDA_VISIBLE_DEVICES=$g python -m calon.baselines.instructuie_eval --ood $D --model $M --sets ${SETG[$g]} \
     --out_dir $OUT > $OUT/gpu$g.log 2>&1 &
 done
 wait
 tail -n 3 $OUT/gpu*.log | cut -c1-300
-python -m ierlcd.baselines.instructuie_eval merge --out_dir $OUT --out $OUT/instructuie-name_only.json \
+python -m calon.baselines.instructuie_eval merge --out_dir $OUT --out $OUT/instructuie-name_only.json \
   --sets crossner_ai crossner_literature crossner_music crossner_politics crossner_science mit_movie mit_restaurant \
   --pii_sets pii_ai4privacy

@@ -34,7 +34,7 @@ git rev-parse HEAD > $RUNS/git_commit.txt
 MASTER=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -1)
 srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir -p \$TMPDIR; \
   torchrun --nnodes=$SLURM_NNODES --nproc_per_node=4 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d \
-  --rdzv_endpoint=$MASTER:29500 -m ierlcd.train.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
+  --rdzv_endpoint=$MASTER:29500 -m calon.train.train --data $MIX --out $RUNS/$NAME --mix $MIXSPEC \
   --encoder $ENCODER --head $HEAD $FF --brier_weight $BRIER --none_weight $NONEW --desc_dropout $DDROP --mode bce \
   --batch 128 --micro 8 --updates $UPDATES --enc_lr 4e-5 --head_lr 2e-4 --eval_every 500 \
   --workers 12 --seed $SEED ${TRAIN_EXTRA:-}" > $RUNS/$NAME.log 2>&1 || {
@@ -42,15 +42,15 @@ srun --kill-on-bad-exit=1 bash -c "export TMPDIR=/tmp/$USER-$SLURM_JOB_ID; mkdir
   grep -q "^done " $RUNS/$NAME.log && [ -s $RUNS/$NAME/final.pt ] || exit 1
   echo "srun exited non-zero after training finished; continuing"; }
 grep -E "EVAL|done" $RUNS/$NAME.log | tail -2 | cut -c1-250
-DECODES=label; [ "$HEAD" = rlcd ] && DECODES="label entity"
+DECODES=label; case "$HEAD" in calon|rlcd) DECODES="label entity";; esac
 for DEC in $DECODES; do
   OUT=$RUNS/$NAME; [ $DEC = entity ] && OUT=$RUNS/$NAME-ent
   mkdir -p $OUT
-  python -m ierlcd.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD $FF \
+  python -m calon.train.calibrate --data $MIX --sources $SOURCES --encoder $ENCODER --head $HEAD $FF \
     --decode $DEC --ckpt $RUNS/$NAME/best.pt --out $OUT/calibration.json > $OUT-calib.log 2>&1
   for V in desc name_only; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
-    python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
+    python -m calon.eval.ood_eval --ood $ROOT/data/ood --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
       --ckpt $RUNS/$NAME/best.pt --calibration $OUT/calibration.json \
       --out $OUT/ood-$V.json > $OUT-ood-$V.log 2>&1
   done
@@ -59,7 +59,7 @@ for DEC in $DECODES; do
     [ -s $ROOT/data/ood_$EXT/manifest.json ] || continue
     for V in desc name_only; do
       FLAG=""; [ $V = name_only ] && FLAG=--name_only
-      python -m ierlcd.eval.ood_eval --ood $ROOT/data/ood_$EXT --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
+      python -m calon.eval.ood_eval --ood $ROOT/data/ood_$EXT --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
         --ckpt $RUNS/$NAME/best.pt --calibration $OUT/calibration.json \
         --out $OUT/ood-$EXT-$V.json > $OUT-ood-$EXT-$V.log 2>&1
     done

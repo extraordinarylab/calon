@@ -23,16 +23,16 @@ mkdir -p $RUNS
 git rev-parse HEAD > $RUNS/git_commit.txt
 
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_mix --stage inventory --out $MIX
+python -m calon.data.prepare_mix --stage inventory --out $MIX
 if [ ! -s $BANK ]; then
   conda activate ie-rlcd-vllm
-  python -m ierlcd.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
+  python -m calon.synth.label_bank --inventory $MIX/inventory.json --model $QWEN --out $BANK \
     > $RUNS/label_bank.log 2>&1 || { tail -20 $RUNS/label_bank.log; exit 1; }
   tail -8 $RUNS/label_bank.log
   conda activate ie-rlcd
 fi
-python -m ierlcd.data.prepare_mix --stage build --bank $BANK --out $MIX > $RUNS/build.log 2>&1
-python -m ierlcd.train.train --data $MIX --out $RUNS/warmup --mode bce --updates $UPDATES \
+python -m calon.data.prepare_mix --stage build --bank $BANK --out $MIX > $RUNS/build.log 2>&1
+python -m calon.train.train --data $MIX --out $RUNS/warmup --mode bce --updates $UPDATES \
   --eval_every 1000 --workers 48 --seed $SEED > $RUNS/warmup.log 2>&1
 grep -E "EVAL|done" $RUNS/warmup.log | cut -c1-300
 echo "===== WARMUP DONE ====="

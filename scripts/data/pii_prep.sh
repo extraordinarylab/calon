@@ -16,25 +16,25 @@ export PYTHONPATH=src HF_HUB_DISABLE_XET=1 TOKENIZERS_PARALLELISM=false HF_HOME=
 ROOT=/scratch/u6sn/yangw.u6sn/ie-rlcd
 P=$ROOT/data/ood_pii
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_pii build 2>&1 | tail -1 | cut -c1-600
+python -m calon.data.prepare_pii build 2>&1 | tail -1 | cut -c1-600
 conda activate ie-rlcd-vllm
-HF_HUB_OFFLINE=1 python -m ierlcd.synth.label_bank --inventory $P/inventory.json \
+HF_HUB_OFFLINE=1 python -m calon.synth.label_bank --inventory $P/inventory.json \
   --model /scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B --out $P/label_bank.json > $P/label_bank.log 2>&1
 tail -4 $P/label_bank.log | cut -c1-250
 conda activate ie-rlcd
-python -m ierlcd.data.prepare_pii finish 2>&1 | tail -1 | cut -c1-600
+python -m calon.data.prepare_pii finish 2>&1 | tail -1 | cut -c1-600
 OUT=$ROOT/runs2/gliner2-pii; mkdir -p $OUT
 conda activate $CONDA/envs/gliner2
 for M in fastino/gliner2-base-v1 fastino/gliner2-large-v1 fastino/gliner2.5-base-v1; do
   for V in desc name_only; do
     FLAG=""; [ $V = name_only ] && FLAG=--name_only
-    python -m ierlcd.baselines.gliner2_eval --ood $P --model $M $FLAG --out $OUT/$(basename $M)-$V.json \
+    python -m calon.baselines.gliner2_eval --ood $P --model $M $FLAG --out $OUT/$(basename $M)-$V.json \
       > $OUT/$(basename $M)-$V.log 2>&1 && echo "$(basename $M)-$V $(tail -1 $OUT/$(basename $M)-$V.log | cut -c1-200)"
   done
 done
 conda activate $CONDA/envs/gliformer
 for M in knowledgator/gliformer-base-v1 knowledgator/gliformer-large-v1; do
-  python -m ierlcd.baselines.gliner2_eval --backend gliformer --name_only --ood $P --model $M \
+  python -m calon.baselines.gliner2_eval --backend gliformer --name_only --ood $P --model $M \
     --out $OUT/$(basename $M)-name_only.json > $OUT/$(basename $M)-name_only.log 2>&1 && \
     echo "$(basename $M)-name_only $(tail -1 $OUT/$(basename $M)-name_only.log | cut -c1-200)"
 done

@@ -1,6 +1,8 @@
-# English schema-conditioned NER — Spec v0.3
+# CalOn：英文 schema-conditioned 資訊抽取 — Spec v0.3
 
 更新：2026-09-28。範圍：英文 NER、character offsets、label descriptions；RE／EE 等 RLCD 贏過基準模型後再加入。
+
+**命名（2026-09-29）**：方法改名為 CalOn（讀作 KAL-on）。它是「校準後的型別或 null 決策」：每個候選片段（或有方向的實體對）在 null 和各型別之間選一個，只有 1 − p(null) 超過門檻才輸出。現在的訓練目標沒有強化學習的步驟，Brier 權重是 0，所以不再稱為 RLCD。下文與舊報告中的「RLCD」都是指同一個方法；程式碼裡的 `--head rlcd` 會自動當成 `--head calon`。
 
 **第 0 節是目前實際在跑的做法（第 4 輪實驗）。第 1–6 節和附錄是 v0.2 的原始規格，保留作紀錄；兩者不一致時以第 0 節為準。**
 

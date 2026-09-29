@@ -133,7 +133,7 @@ def llm(model, max_len=8192, tp=1):
     if "mistral" in model.lower():         # HF config and weights, Mistral's own (tekken) tokenizer
         kw.update(config_format="hf", tokenizer_mode="mistral")
     try:
-        return LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0})
+        return LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0, "audio": 0})
     except Exception as exc:
         print("retrying without limit_mm_per_prompt:", repr(exc)[:200], flush=True)
         return LLM(**kw)

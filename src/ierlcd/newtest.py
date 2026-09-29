@@ -100,8 +100,6 @@ def llm(model, max_len=8192):
     from vllm import LLM
     kw = dict(model=model, max_model_len=max_len, gpu_memory_utilization=0.9, max_num_seqs=128,
               trust_remote_code=True)
-    if "mistral" in model.lower():
-        kw.update(tokenizer_mode="mistral", config_format="mistral", load_format="mistral")
     try:
         return LLM(**kw, limit_mm_per_prompt={"image": 0, "video": 0})
     except Exception as exc:
@@ -127,15 +125,17 @@ def final_text(t):
 
 
 def last_json(t):
-    """The last parseable JSON object or list in the text."""
+    """The longest parseable JSON object or list in the text (the latest one on a tie),
+    so an inner list of the answer object is never returned instead of the object."""
     dec = json.JSONDecoder()
-    best = None
+    best, best_len = None, -1
     for m in re.finditer(r"[\[{]", t):
         try:
-            v, _ = dec.raw_decode(t[m.start():])
-            best = v
+            v, end = dec.raw_decode(t[m.start():])
         except json.JSONDecodeError:
             continue
+        if end >= best_len:
+            best, best_len = v, end
     return best
 
 

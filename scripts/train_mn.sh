@@ -55,13 +55,14 @@ for DEC in $DECODES; do
       --out $OUT/ood-$V.json > $OUT-ood-$V.log 2>&1
   done
   cp $OUT/ood-desc.json $OUT/ood.json
-  if [ -s $ROOT/data/ood_pii/manifest.json ]; then       # separate PII evaluation set
+  for EXT in pii spy new; do                             # separate evaluation sets, when built
+    [ -s $ROOT/data/ood_$EXT/manifest.json ] || continue
     for V in desc name_only; do
       FLAG=""; [ $V = name_only ] && FLAG=--name_only
-      python -m ierlcd.ood_eval --ood $ROOT/data/ood_pii --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
+      python -m ierlcd.ood_eval --ood $ROOT/data/ood_$EXT --encoder $ENCODER --head $HEAD --decode $DEC $FLAG \
         --ckpt $RUNS/$NAME/best.pt --calibration $OUT/calibration.json \
-        --out $OUT/ood-pii-$V.json > $OUT-ood-pii-$V.log 2>&1
+        --out $OUT/ood-$EXT-$V.json > $OUT-ood-$EXT-$V.log 2>&1
     done
-  fi
+  done
 done
 echo "===== $EXP s$SEED $NAME DONE ====="

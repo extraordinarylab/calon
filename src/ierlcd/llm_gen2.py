@@ -311,17 +311,20 @@ def apply_fill(args):
 
 
 def prepare_c2(args):
+    """Seeded requests: 5 CrossNER / MIT train-split examples each (tag c2, or c3 for
+    round 5 with fresh example draws)."""
+    tag = getattr(args, "tag", "c2")
     pools = seed_pool()
     reqs = []
     for dom, pool in pools.items():
         labels = schema_items(pool[0]["schema"])
         for k in range(args.per_domain):
-            rng = random.Random(seed_of(f"c2:{dom}:{k}"))
+            rng = random.Random(seed_of(f"{tag}:{dom}:{k}"))
             ex = rng.sample(pool, min(5, len(pool)))
-            reqs.append({"id": f"c2:{dom}:{k}", "domain": dom, "labels": labels,
+            reqs.append({"id": f"{tag}:{dom}:{k}", "domain": dom, "labels": labels,
                          "examples": [format_example(e) for e in ex]})
-    write_jsonl(S2 / "c2_requests.jsonl", reqs)
-    print("c2 requests", len(reqs))
+    write_jsonl(S2 / f"{tag}_requests.jsonl", reqs)
+    print(f"{tag} requests", len(reqs))
 
 
 def type_pool(entries):
@@ -435,7 +438,7 @@ def run(args):
     llm = LLM(model=args.model, tensor_parallel_size=1, max_model_len=args.max_model_len,
               gpu_memory_utilization=0.9, max_num_seqs=256, seed=0,
               limit_mm_per_prompt={"image": 0, "video": 0})
-    sampled = args.task in ("g", "g2", "g3", "c2")
+    sampled = args.task in ("g", "g2", "g3", "c2", "c3")
     for c in range(0, len(todo), args.chunk):
         chunk = todo[c:c + args.chunk]
         t0 = time.time()
@@ -546,6 +549,17 @@ def g_rows(task, source, stats, find_all):
     return rows
 
 
+def assemble_c(args):
+    """Rebuild MIX_DIR/synth_c from all seeded generations (c2 + c3 + round 1)."""
+    from transformers import AutoTokenizer
+    from .prepare_data import word_ngrams
+    from .prepare_mix import find_all
+    stats = collections.Counter()
+    tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
+    summary = finalize(args, {"synth_c": c_rows(stats, find_all, word_ngrams)}, stats, tok, MIX_DIR)
+    write_summary(summary, stats, "assemble_c_summary.json")
+
+
 def assemble_g2(args):
     """Build data/mix2/synth_g2 (round-3 music / literature / spoken synthetic text) only."""
     from transformers import AutoTokenizer
@@ -597,12 +611,15 @@ def r_rows(stats, find_all):
 
 
 def c_rows(stats, find_all, word_ngrams):
-    """Target-style rows (non zero-shot): round-1 seeded train rows plus c2."""
-    reqs = {r["id"]: r for r in read_jsonl(S2 / "c2_requests.jsonl")}
+    """Target-style rows seeded with CrossNER / MIT train examples: round-1 seeded
+    train rows plus c2 and (if generated) c3."""
+    tags = [t for t in ("c2", "c3") if (S2 / f"{t}_requests.jsonl").exists()]
+    reqs = {r["id"]: r for t in tags for r in read_jsonl(S2 / f"{t}_requests.jsonl")}
     pools = seed_pool()
     seed_grams = {d: [word_ngrams(r["input"]) for r in pool] for d, pool in pools.items()}
     rows = []
-    for rid, o in load_outputs("c2").items():
+    outputs = {rid: o for t in tags for rid, o in load_outputs(t).items()}
+    for rid, o in outputs.items():
         req, js = reqs[rid], parse_json(o["output"])
         if not isinstance(js, dict) or not isinstance(js.get("examples"), list):
             stats["c2_parse_fail"] += 1
@@ -705,6 +722,9 @@ def main():
     p = sub.add_parser("prepare-g"); p.add_argument("--n", type=int, default=120000)
     p.add_argument("--seed", type=int, default=42)
     p = sub.add_parser("prepare-c2"); p.add_argument("--per-domain", type=int, default=2060)
+    p.add_argument("--tag", default="c2", choices=["c2", "c3"])
+    p = sub.add_parser("assemble-c"); p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--max-tokens", type=int, default=1024)
     sub.add_parser("prepare-r2")
     sub.add_parser("prepare-n")
     p = sub.add_parser("assemble"); p.add_argument("--seed", type=int, default=42)
@@ -719,7 +739,7 @@ def main():
     sub.add_parser("prepare-fill")
     sub.add_parser("apply-fill")
     p = sub.add_parser("run")
-    p.add_argument("--task", choices=["g", "g2", "g3", "c2", "r1", "r2", "n", "fill"], required=True)
+    p.add_argument("--task", choices=["g", "g2", "g3", "c2", "c3", "r1", "r2", "n", "fill"], required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--num-shards", type=int, default=1)
@@ -731,7 +751,7 @@ def main():
     S2.mkdir(parents=True, exist_ok=True)
     {"fetch-real": fetch_real, "prepare-g": prepare_g, "prepare-c2": prepare_c2, "prepare-r2": prepare_r2,
      "prepare-n": prepare_n, "assemble": assemble, "prepare-g2": prepare_g2, "assemble-g2": assemble_g2,
-     "prepare-g3": prepare_g3, "prepare-fill": prepare_fill, "apply-fill": apply_fill,
+     "prepare-g3": prepare_g3, "prepare-fill": prepare_fill, "apply-fill": apply_fill, "assemble-c": assemble_c,
      "run": run}[args.cmd](args)
 
 

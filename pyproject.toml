@@ -8,10 +8,11 @@ dependencies = [
     "torch",
     "transformers>=5",
     "huggingface_hub",
+    "pyarrow",
 ]
 
 [project.optional-dependencies]
-data = ["pandas", "pyarrow", "datasets"]
+data = ["pandas", "datasets"]
 dev = ["pytest", "ruff", "mypy"]
 
 [tool.setuptools.packages.find]

@@ -38,7 +38,7 @@ jobs:
         run: |
           uv venv
           uv pip install --torch-backend=cpu torch
-          uv pip install "transformers>=5" numpy huggingface_hub pytest
+          uv pip install "transformers>=5" numpy huggingface_hub pyarrow pytest
       - name: pytest
         # tests that need model weights (Qwen) skip themselves; ModernBERT's tokenizer is
         # downloaded from the Hugging Face Hub

@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from .llm_annotate import A2_PROMPT, clean_type, parse_json
+from .llm_annotate import A2_PROMPT, clean_type
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 
@@ -30,20 +30,17 @@ def main():
         types = "\n".join(f'- "{q["label"]}": {q["description"]}' if q["description"] else f'- "{q["label"]}"'
                           for q in qs)
         prompts.append([{"role": "user", "content": A2_PROMPT.format(text=r["text"], types=types)}])
-    from vllm import LLM, SamplingParams
+    from .newtest import chat, last_json, llm
     t0 = time.time()
-    llm = LLM(model=args.model, max_model_len=8192, gpu_memory_utilization=0.9, max_num_seqs=128,
-              trust_remote_code=True, limit_mm_per_prompt={"image": 0, "video": 0, "audio": 0})
+    engine = llm(args.model)
     load = time.time() - t0
     t0 = time.time()
-    outs = llm.chat(prompts, SamplingParams(temperature=0.0, max_tokens=1024),
-                    chat_template_kwargs={"enable_thinking": False})
+    outs = chat(engine, [p[0]["content"] for p in prompts], 1024)
     gen = time.time() - t0
     parsed = agree = qwen_n = new_n = 0
     samples = []
-    for r, o in zip(rows, outs):
-        text = o.outputs[0].text
-        js = parse_json(text)
+    for r, text in zip(rows, outs):
+        js = last_json(text)
         if isinstance(js, dict):
             parsed += 1
             ans = {clean_type(k): {str(x).strip() for x in v} for k, v in js.items() if isinstance(v, list)}

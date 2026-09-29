@@ -27,7 +27,7 @@ try:
 except Exception as e:
     print("wikipedia api FAILED:", repr(e)[:200])
 EOF
-for M in google/gemma-4-26B-A4B-it tencent/Hunyuan-A13B-Instruct nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16; do
+for M in ${MODELS:-mistralai/Mistral-Small-3.2-24B-Instruct-2506 openai/gpt-oss-120b}; do
   timeout 3000 python -m ierlcd.smoke_llms --model $H/$M --out $OUT/$(basename $M).json > $OUT/$(basename $M).log 2>&1 \
     && tail -1 $OUT/$(basename $M).log | cut -c1-300 || { echo "FAILED $M"; grep -E "Error|error" $OUT/$(basename $M).log | tail -3 | cut -c1-300; }
 done

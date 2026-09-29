@@ -96,9 +96,9 @@ def fetch_wiki(args):
     print(json.dumps({"created_titles": len(titles), "pages_with_lead": len(pages), "window": [START, END]}))
 
 
-def llm(model, max_len=8192):
+def llm(model, max_len=8192, tp=1):
     from vllm import LLM
-    kw = dict(model=model, max_model_len=max_len, gpu_memory_utilization=0.9, max_num_seqs=128,
+    kw = dict(model=model, max_model_len=max_len, gpu_memory_utilization=0.9, max_num_seqs=128, tensor_parallel_size=tp,
               trust_remote_code=True)
     if "mistral" in model.lower():         # HF config and weights, Mistral's own (tekken) tokenizer
         kw.update(config_format="hf", tokenizer_mode="mistral")
@@ -143,7 +143,7 @@ def last_json(t):
 
 def classify(args):
     pages = read_jsonl(W / "wiki_pages.jsonl")
-    engine = llm(args.model)
+    engine = llm(args.model, tp=args.tp)
     outs = chat(engine, [CLASSIFY.format(title=p["title"], text=" ".join(p["text"].split()[:150]))
                          for p in pages], 64)
     for p, o in zip(pages, outs):
@@ -187,7 +187,7 @@ def snippets(args):
 
 
 def gen_mit(args):
-    engine = llm(args.model)
+    engine = llm(args.model, tp=args.tp)
     rows = []
     for dom, (what, things) in {"movie": ("movie", "movies, actors and plots"),
                                 "restaurant": ("restaurant", "restaurants, dishes and places")}.items():
@@ -236,7 +236,7 @@ def all_snippets():
 def annotate(args):
     sch = schemas()
     rows = all_snippets()
-    engine = llm(args.model)
+    engine = llm(args.model, tp=args.tp)
     prompts = []
     for r in rows:
         types = "\n".join(f'- "{t}": {d}' if d else f'- "{t}"' for t, d in sch[r["domain"]])
@@ -310,6 +310,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["fetch-wiki", "classify", "snippets", "gen-mit", "annotate", "assemble"])
     ap.add_argument("--model")
+    ap.add_argument("--tp", type=int, default=1, help="tensor-parallel GPUs")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--per-domain", type=int, default=400)
     ap.add_argument("--mit-requests", type=int, default=150)

@@ -107,6 +107,8 @@ def main():
     ap.add_argument("--label_pool", default="mean", choices=["mean", "marker", "both"])
     ap.add_argument("--head_hidden", type=int, default=512)
     ap.add_argument("--head_out", type=int, default=256)
+    ap.add_argument("--head_layers", type=int, default=0,
+                    help="extra transformer layers over the encoder output (Laya uses 2)")
     ap.add_argument("--lowercase_aug", type=float, default=0.0,
                     help="share of training rows shown fully lowercased (MIT-style text)")
     ap.add_argument("--anon_labels", type=float, default=0.0,
@@ -127,7 +129,8 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
         (out / "args.json").write_text(json.dumps({**vars(args), "world_size": world}, indent=2))
         (out / "model_config.json").write_text(json.dumps(
-            {"hidden": args.head_hidden, "out": args.head_out, "label_pool": args.label_pool}))
+            {"hidden": args.head_hidden, "out": args.head_out, "label_pool": args.label_pool,
+             "head_layers": args.head_layers}))
 
     random.seed(args.seed)
     torch.manual_seed(args.seed + rank)
@@ -158,7 +161,8 @@ def main():
         shuffle=False, num_workers=args.workers, prefetch_factor=4, persistent_workers=False)
 
     base = SpanLabelModel(args.encoder, len(tok), W=args.W, head=args.head, hidden=args.head_hidden,
-                          out=args.head_out, label_pool=args.label_pool).to(device)
+                          out=args.head_out, label_pool=args.label_pool,
+                          head_layers=args.head_layers).to(device)
     if args.init:
         base.load_state_dict(torch.load(args.init, map_location=device))
     model = DDP(base, device_ids=[local]) if world > 1 else base

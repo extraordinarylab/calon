@@ -22,7 +22,7 @@ def mlp(d_in, hidden, d_out, dropout):
                          nn.Linear(hidden, d_out))
 
 
-HEAD_KEYS = ("hidden", "out", "label_pool")
+HEAD_KEYS = ("hidden", "out", "label_pool", "head_layers", "head_heads")
 
 
 def load_model(encoder, vocab_size, W, head, ckpt, device="cuda"):
@@ -46,7 +46,8 @@ def padding_only_mask(attention_mask, impl, dtype):
 
 class SpanLabelModel(nn.Module):
     def __init__(self, encoder_name, vocab_size, W=32, hidden=512, out=256, width_dim=32,
-                 dropout=0.1, attn_implementation=None, head="bce", label_pool="mean"):
+                 dropout=0.1, attn_implementation=None, head="bce", label_pool="mean",
+                 head_layers=0, head_heads=16):
         super().__init__()
         self.head_type = head
         # label vector from the name+description tokens ("mean"), from the <LABEL>
@@ -65,6 +66,12 @@ class SpanLabelModel(nn.Module):
                 if hasattr(m, "is_causal"):
                     m.is_causal = False
         d = self.encoder.config.hidden_size
+        self.post = None
+        if head_layers:
+            layer = nn.TransformerEncoderLayer(d, nhead=head_heads, dim_feedforward=4 * d, dropout=dropout,
+                                               activation="gelu", batch_first=True, norm_first=True)
+            self.post = nn.TransformerEncoder(layer, head_layers, norm=nn.LayerNorm(d),
+                                              enable_nested_tensor=False)
         self.width = nn.Embedding(W, width_dim)
         self.span_mlp = mlp(3 * d + width_dim, hidden, out, dropout)
         self.label_mlp = mlp(2 * d if label_pool == "both" else d, hidden, out, dropout)
@@ -86,9 +93,16 @@ class SpanLabelModel(nn.Module):
                             use_cache=False).last_hidden_state
 
     def forward(self, input_ids, attention_mask, label_mask, cand_i, cand_j):
-        h = self.encode(input_ids, attention_mask)
+        h = self.contextualize(self.encode(input_ids, attention_mask), attention_mask)
         with torch.autocast(h.device.type, enabled=False):              # heads in fp32
             return self.head(h.float(), label_mask, cand_i, cand_j)
+
+    def contextualize(self, h, attention_mask):
+        """Optional extra transformer layers over the whole sequence (labels and text
+        together) after the encoder, as in Laya's 2-layer head; identity when 0."""
+        if self.post is None:
+            return h
+        return self.post(h, src_key_padding_mask=~attention_mask.bool())
 
     def head(self, h, label_mask, cand_i, cand_j):
         # label vectors: mean over name+description tokens and/or the <LABEL> marker,

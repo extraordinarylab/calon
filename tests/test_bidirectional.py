@@ -55,6 +55,25 @@ def test_padding_does_not_change_real_tokens(sdpa):
     assert (h2[0, :len(a)] - h3[0, :len(a)]).abs().max().item() <= 1e-4 * scale + 1e-4
 
 
+def test_head_layers_ignore_padding(sdpa):
+    """The extra transformer layers see padding only through the key mask."""
+    tok, m = sdpa
+    from ierlcd.model import SpanLabelModel
+    torch.manual_seed(0)
+    post = SpanLabelModel.__new__(SpanLabelModel)
+    torch.nn.Module.__init__(post)
+    d = m.encoder.config.hidden_size
+    layer = torch.nn.TransformerEncoderLayer(d, 16, 4 * d, 0.0, "gelu", batch_first=True, norm_first=True)
+    post.post = torch.nn.TransformerEncoder(layer, 2, norm=torch.nn.LayerNorm(d), enable_nested_tensor=False).eval()
+    a = tok("Acme hired Maya yesterday", add_special_tokens=False)["input_ids"]
+    pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
+    m1, m2 = torch.tensor([[1] * len(a)]), torch.tensor([[1] * len(a) + [0] * 5])
+    with torch.no_grad():
+        h1 = post.contextualize(hidden(m, [a], m1.tolist()), m1)
+        h2 = post.contextualize(hidden(m, [a + [pad] * 5], m2.tolist()), m2)
+    assert (h1[0] - h2[0, :len(a)]).abs().max().item() <= 1e-3
+
+
 def test_sdpa_matches_eager(sdpa):
     tok, m = sdpa
     _, me = build("eager")

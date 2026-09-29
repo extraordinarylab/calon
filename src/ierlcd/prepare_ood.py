@@ -29,7 +29,16 @@ def label_key(label):
     return label.lower().replace("_", " ").strip()
 
 
-def adapt(name, repo, rev, rel):
+def split_file(rel, split):
+    """Test file path -> the same benchmark's train / validation file (MIT has no validation)."""
+    if split == "test":
+        return rel
+    if rel.startswith("data/mit_"):
+        return rel.replace("_test.jsonl", "_train.jsonl") if split == "train" else None
+    return rel.replace("/test.jsonl", f"/{split}.jsonl")
+
+
+def adapt(name, repo, rev, rel, split="test"):
     path = HUB / f"datasets--{repo.replace('/', '--')}" / "snapshots" / rev / rel
     rows, mismatch = [], 0
     with open(path) as f:
@@ -52,7 +61,7 @@ def adapt(name, repo, rev, rel):
                 "supervision_origin": "source" if label in pos else "benchmark_closed_world"}
                 for label, desc in schema_labels(rec["schema"])]
             assert pos <= {q["label"] for q in queries}, (name, idx)
-            rows.append({"id": f"{name}:test:{idx}", "source": name, "text": text,
+            rows.append({"id": f"{name}:{split}:{idx}", "source": name, "text": text,
                          "queries": queries, "entities": entities})
     return rows, mismatch
 
@@ -61,15 +70,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--train", required=True, help="FiNERWeb train.jsonl, for seen-label bookkeeping")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--split", default="test", choices=["test", "train", "validation"],
+                    help="train / validation: the benchmarks' other splits, for the contamination check")
+    ap.add_argument("--max_rows", type=int, default=0, help="keep the first N rows per set (0 = all)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     with open(args.train) as f:
         train_labels = {label_key(q["label"]) for line in f for q in json.loads(line)["queries"]}
-    manifest = {"scope_policy": "benchmark_closed_world", "splits_used": "test only",
+    manifest = {"scope_policy": "benchmark_closed_world", "splits_used": f"{args.split} only",
                 "threshold_policy": "zero-shot: FiNERWeb dev_calib T and threshold", "sets": {}}
     for name, (repo, rev, rel) in SOURCES.items():
-        rows, mismatch = adapt(name, repo, rev, rel)
+        rel = split_file(rel, args.split)
+        if rel is None:
+            continue
+        rows, mismatch = adapt(name, repo, rev, rel, args.split)
+        if args.max_rows:
+            rows = rows[:args.max_rows]
         with open(out / f"{name}.jsonl", "w") as f:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")

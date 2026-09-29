@@ -8,6 +8,21 @@
 - 不要列出 job ID、檔案路徑、參數名稱，除非使用者問起。
 - 一次回報控制在幾句話或一張小表；細節等使用者問再講。
 
+## Code layout
+
+| Path | Contents |
+| --- | --- |
+| `src/ierlcd/model/` | span-label model, losses |
+| `src/ierlcd/data/` | tokenization / candidates, collator, source adapters, mixture sampling, eval-set builders, leakage audit |
+| `src/ierlcd/synth/` | LLM generation / annotation (Qwen, REBEL), label descriptions, refinement (re-annotation, RLCD flags, judge) |
+| `src/ierlcd/train/` | DDP training, calibration |
+| `src/ierlcd/eval/` | metrics, OOD evaluation, summaries, fresh contamination test sets |
+| `src/ierlcd/baselines/` | GLiNER2 / gliformer, InstructUIE, GNER evaluation |
+| `tools/` | one-off analyses and smoke tests (not part of the package; run as `python -m tools.<name>` from the repo root) |
+| `scripts/<env,data,synth,train,eval,baselines,launch>/` | sbatch scripts by purpose; `launch/` scripts only call sbatch |
+
+New code goes into the matching subpackage; nothing new at `src/ierlcd/` top level.
+
 ## Never compute on the login node
 
 Development, smoke tests and debugging go to the **interactive** partition.

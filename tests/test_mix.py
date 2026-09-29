@@ -4,8 +4,8 @@ import random
 
 import pytest
 
-from ierlcd.alignment import build_candidates, build_candidates_np, tokenize_text
-from ierlcd.prepare_mix import (contamination_filter, fewnerd_name, find_all, parse_massive,
+from ierlcd.data.alignment import build_candidates, build_candidates_np, tokenize_text
+from ierlcd.data.prepare_mix import (contamination_filter, fewnerd_name, find_all, parse_massive,
                                 sample_queries)
 
 

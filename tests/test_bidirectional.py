@@ -13,8 +13,8 @@ pytestmark = pytest.mark.skipif(not (QWEN / "config.json").exists(), reason="Qwe
 
 def build(impl):
     from transformers import AutoTokenizer
-    from ierlcd.collator import add_control_tokens
-    from ierlcd.model import SpanLabelModel
+    from ierlcd.data.collator import add_control_tokens
+    from ierlcd.model.model import SpanLabelModel
     tok = AutoTokenizer.from_pretrained(QWEN)
     add_control_tokens(tok)
     m = SpanLabelModel(str(QWEN), len(tok), attn_implementation=impl).eval()
@@ -58,7 +58,7 @@ def test_padding_does_not_change_real_tokens(sdpa):
 def test_head_layers_ignore_padding(sdpa):
     """The extra transformer layers see padding only through the key mask."""
     tok, m = sdpa
-    from ierlcd.model import SpanLabelModel
+    from ierlcd.model.model import SpanLabelModel
     torch.manual_seed(0)
     post = SpanLabelModel.__new__(SpanLabelModel)
     torch.nn.Module.__init__(post)

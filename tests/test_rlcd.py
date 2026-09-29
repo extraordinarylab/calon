@@ -3,8 +3,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from ierlcd.evaluate import decode, rlcd_brier, with_temperature
-from ierlcd.losses import rlcd_log_probs, rlcd_loss
+from ierlcd.eval.evaluate import decode, rlcd_brier, with_temperature
+from ierlcd.model.losses import rlcd_log_probs, rlcd_loss
 
 
 def setup():

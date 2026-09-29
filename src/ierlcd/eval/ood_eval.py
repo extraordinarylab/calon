@@ -12,12 +12,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-import torch
 from transformers import AutoTokenizer
 
 from ..data.collator import Collator, add_control_tokens, encode_row, load_rows
-from .evaluate import decode, f1, metrics, predict, with_temperature
 from ..model.model import load_model
+from .evaluate import decode, f1, metrics, predict, with_temperature
 
 
 def per_query(encs, outs, T, threshold):

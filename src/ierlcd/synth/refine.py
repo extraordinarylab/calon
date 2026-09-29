@@ -18,8 +18,8 @@ import json
 import os
 from pathlib import Path
 
-from .llm_annotate import align, clean_type, parse_json, read_jsonl, write_jsonl
 from ..eval.newtest import final_text, last_json
+from .llm_annotate import align, clean_type, parse_json, read_jsonl, write_jsonl
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 S2 = ROOT / "synth2"

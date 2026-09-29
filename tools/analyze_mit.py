@@ -51,8 +51,8 @@ def main():
                     if name == "rlcd" and mode == "desc" and seed == 42:
                         print(f"== {s} RLCD error types (seed 42, with descriptions):", json.dumps(o["errors"]))
                 for lab, v in vals.items():
-                    per[lab][f"{name}-{mode}"] = (np.mean([x["precision"] for x in v]), np.mean([x["recall"] for x in v]),
-                                                  np.mean([x["f1"] for x in v]))
+                    keys = ("precision", "recall", "f1")
+                    per[lab][f"{name}-{mode}"] = tuple(np.mean([x[k] for x in v]) for k in keys)
         for lab, v in glif[s]["per_label"].items():
             per[lab]["glif-name"] = (v["precision"], v["recall"], v["f1"])
         for lab, v in g2[s]["per_label"].items():

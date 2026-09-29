@@ -19,8 +19,6 @@ import json
 import random
 import re
 import time
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 from ..synth.llm_annotate import A2_PROMPT, align, clean_type, read_jsonl, write_jsonl

@@ -1,6 +1,5 @@
 """SPEC 6 correctness tests 1-3 for offsets, collation and splits."""
 import json
-import os
 
 import pytest
 import torch
@@ -91,10 +90,10 @@ def test_finerweb_adapter_and_split(tmp_path):
          "schema": {"entities": [{"label": "person", "description": "a human"}]}},
         {"input": "Acme hired Maya .", "output": {"entities": {"org": [{"text": "Acme", "start": 0, "end": 4}]}},
          "schema": [{"label": "org", "description": ""}, {"label": "city", "description": ""}]},
-        {"input": "the quick brown fox jumps over the lazy dog in the park near the old river bank today", "output": {"entities": {}},
-         "schema": {"entities": []}},
-        {"input": "The quick brown fox jumps over the lazy dog in the park near the old river bank today!", "output": {"entities": {}},
-         "schema": {"entities": []}},
+        {"input": "the quick brown fox jumps over the lazy dog in the park near the old river bank today",
+         "output": {"entities": {}}, "schema": {"entities": []}},
+        {"input": "The quick brown fox jumps over the lazy dog in the park near the old river bank today!",
+         "output": {"entities": {}}, "schema": {"entities": []}},
     ]
     p = tmp_path / "f.jsonl"
     p.write_text("\n".join(json.dumps(r) for r in recs))

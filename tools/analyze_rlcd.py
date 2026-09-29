@@ -59,14 +59,16 @@ def main():
         print(f"\n== {name}  ({n_labels} labels asked per row)")
         for a in arms:
             m = [r["sets"][name][KEY] for r in res[a]]
-            fp = collections.Counter(); fn = collections.Counter()
+            fp, fn = collections.Counter(), collections.Counter()
             for x in m:
-                fp.update(x["errors"]["fp"]); fn.update(x["errors"]["fn"])
+                fp.update(x["errors"]["fp"])
+                fn.update(x["errors"]["fn"])
             nfp = sum(v for k, v in fp.items() if k != "wrong_type_extra_label") or 1
             nfn = sum(fn.values()) or 1
             print(f"  {a:12s} P={mean([x['precision'] for x in m]):.3f} R={mean([x['recall'] for x in m]):.3f} "
                   f"F1={mean([x['f1'] for x in m]):.3f} absentFPR={mean([x['absent_query_fpr'] for x in m]):.3f} "
-                  f"| FP/seed={nfp / len(m):.0f} type={fp['wrong_type'] / nfp:.2f} bnd+type={fp['boundary_and_type'] / nfp:.2f} "
+                  f"| FP/seed={nfp / len(m):.0f} type={fp['wrong_type'] / nfp:.2f} "
+                  f"bnd+type={fp['boundary_and_type'] / nfp:.2f} "
                   f"spur={fp['spurious'] / nfp:.2f} | FN/seed={nfn / len(m):.0f} missed={fn['missed'] / nfn:.2f} "
                   f"other-type={fn['found_as_other_type'] / nfn:.2f} bnd={fn['boundary'] / nfn:.2f}")
         labs = res[arms[0]][0]["sets"][name][KEY]["per_label"].keys()

@@ -59,9 +59,10 @@ def rlcd_loss(u, y, valid, query_mask, cand_mask, brier_weight=1.0, stats=None, 
         return u.float().sum() * 0
     per_row = per_span.sum(-1) / w.sum(-1).clamp_min(1e-8)
     if stats is not None:
-        sel = span_ok
-        stats["rlcd_ce"] = ((torch.where(sel, ce, torch.zeros_like(ce)).sum(-1) / cnt.clamp_min(1))[active].mean().item())
-        stats["rlcd_brier"] = ((torch.where(sel, brier, torch.zeros_like(brier)).sum(-1) / cnt.clamp_min(1))[active].mean().item())
+        def row_mean(x):
+            return (torch.where(span_ok, x, torch.zeros_like(x)).sum(-1) / cnt.clamp_min(1))[active].mean().item()
+        stats["rlcd_ce"] = row_mean(ce)
+        stats["rlcd_brier"] = row_mean(brier)
     return per_row[active].mean()
 
 

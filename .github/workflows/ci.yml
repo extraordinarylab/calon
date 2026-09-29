@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - name: ruff
+        run: uvx ruff check src tests tools
+      - name: mypy
+        run: |
+          uv venv
+          uv pip install mypy numpy
+          uv run mypy
+
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - name: install (CPU torch)
+        run: |
+          uv venv
+          uv pip install --torch-backend=cpu torch
+          uv pip install "transformers>=5" numpy huggingface_hub pyarrow pytest
+      - name: pytest
+        # tests that need model weights (Qwen) skip themselves; ModernBERT's tokenizer is
+        # downloaded from the Hugging Face Hub
+        run: uv run pytest -q

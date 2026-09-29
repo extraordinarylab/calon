@@ -119,7 +119,7 @@ def collect_all(root, exps, seeds):
                 for k, v in m.items():
                     vals[k].append(v)
                 c = load(d / a / "calibration.json")
-                if c and not ("raw@0.5" in c.get("test", {})):
+                if c and "raw@0.5" not in c.get("test", {}):
                     for src, t in c["test"].items():
                         vals[f"test/{src}"].append(t["calibrated@tuned"]["f1"])
                 elif c:

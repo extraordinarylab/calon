@@ -67,8 +67,8 @@ def chunks(text, ents, max_chars):
 
 
 def build(args):
-    from huggingface_hub import HfApi, hf_hub_download
     import pandas as pd
+    from huggingface_hub import HfApi, hf_hub_download
     api = HfApi()
     info = api.dataset_info(REPO)
     files = [f for f in api.list_repo_files(REPO, repo_type="dataset", revision=info.sha)

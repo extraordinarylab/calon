@@ -20,6 +20,8 @@ SOURCE_CONTEXT = {
                 "music, weather, calendar, shopping, transport, smart home and similar)"),
     "pii": ("personally identifiable information in messages, forms and documents (names, contact "
             "details, identifiers, addresses, dates)"),
+    "spy": ("personal identifiers in English legal advice requests written by members of the public "
+            "(names, contact details, addresses, web addresses, usernames, identification numbers)"),
 }
 SYSTEM = ("You write concise label definitions for an entity extraction schema. "
           "Answer with JSON only.")

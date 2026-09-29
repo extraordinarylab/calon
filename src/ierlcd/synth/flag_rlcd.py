@@ -10,7 +10,6 @@ One shard of the rows per call; output synth2/rlcd_flags/shard-*.jsonl.
 """
 import argparse
 import json
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -18,8 +17,8 @@ from transformers import AutoTokenizer
 
 from ..data.collator import Collator, add_control_tokens, encode_row
 from ..eval.evaluate import predict, rlcd_probs
-from .llm_annotate import read_jsonl
 from ..model.model import load_model
+from .llm_annotate import read_jsonl
 from .refine import MIX_DIR, S2, SOURCES
 
 

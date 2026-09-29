@@ -103,7 +103,8 @@ def run(args):
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("prepare"); p.add_argument("--num-shards", type=int, default=256)
+    p = sub.add_parser("prepare")
+    p.add_argument("--num-shards", type=int, default=256)
     p = sub.add_parser("run")
     p.add_argument("--shard", type=int, required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")

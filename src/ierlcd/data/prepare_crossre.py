@@ -30,6 +30,7 @@ def span(tokens, starts, i, j):
 def main():
     import pyarrow.parquet as pq
     from huggingface_hub import HfApi, snapshot_download
+
     from .prepare_data import norm_text, sha, word_ngrams
     api = HfApi()
     info = api.dataset_info("DFKI-SLT/cross_re")

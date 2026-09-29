@@ -103,6 +103,7 @@ def chunk_passages(text, max_words=180, min_words=40):
 def prepare_a(args):
     import pyarrow.parquet as pq
     from huggingface_hub import HfApi, hf_hub_download
+
     from ..data.prepare_data import SPLITS  # noqa: F401  (split names used in assemble)
     from ..data.prepare_mix import contamination_filter
 
@@ -439,8 +440,9 @@ def assemble(args):
     ood_test = []
     for f in (ROOT / "data/ood").glob("*.jsonl"):
         ood_test += [r["text"] for r in read_jsonl(f)]
-    from ..data.prepare_mix import fixed_eval_queries
     from transformers import AutoTokenizer
+
+    from ..data.prepare_mix import fixed_eval_queries
     tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
     summary = {}
     for src, rows in rows_by_src.items():
@@ -476,12 +478,16 @@ def assemble(args):
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("prepare-a"); p.add_argument("--n", type=int, default=100000)
+    p = sub.add_parser("prepare-a")
+    p.add_argument("--n", type=int, default=100000)
     p.add_argument("--seed", type=int, default=42)
-    p = sub.add_parser("prepare-c"); p.add_argument("--per-domain", type=int, default=1000)
+    p = sub.add_parser("prepare-c")
+    p.add_argument("--per-domain", type=int, default=1000)
     p.add_argument("--k", type=int, default=5)
-    p = sub.add_parser("prepare-a2"); p.add_argument("--min-type-count", type=int, default=3)
-    p = sub.add_parser("assemble"); p.add_argument("--seed", type=int, default=42)
+    p = sub.add_parser("prepare-a2")
+    p.add_argument("--min-type-count", type=int, default=3)
+    p = sub.add_parser("assemble")
+    p.add_argument("--seed", type=int, default=42)
     p = sub.add_parser("run")
     p.add_argument("--task", choices=["a1", "a2", "c"], required=True)
     p.add_argument("--model", default="/scratch/u6sn/yangw.u6sn/huggingface_models/Qwen/Qwen3.8-27B")

@@ -25,9 +25,23 @@ import re
 import time
 from pathlib import Path
 
-from .llm_annotate import (A1_PROMPT, A2_PROMPT, C_DOMAIN_NAMES, C_PROMPT, CROSSNER_DOMAINS,
-                           align, chunk_passages, clean_type, format_example, parse_a1,
-                           parse_json, read_jsonl, schema_items, seed_of, seed_pool, write_jsonl)
+from .llm_annotate import (
+    A1_PROMPT,
+    A2_PROMPT,
+    C_DOMAIN_NAMES,
+    C_PROMPT,
+    align,
+    chunk_passages,
+    clean_type,
+    format_example,
+    parse_a1,
+    parse_json,
+    read_jsonl,
+    schema_items,
+    seed_of,
+    seed_pool,
+    write_jsonl,
+)
 
 ROOT = Path("/scratch/u6sn/yangw.u6sn/ie-rlcd")
 S2 = ROOT / "synth2"
@@ -165,6 +179,7 @@ def iter_records(path, max_records):
 
 def fetch_real(args):
     from huggingface_hub import HfApi, hf_hub_download
+
     from ..data.prepare_mix import contamination_filter
     api = HfApi()
     stats, meta, passages = collections.Counter(), {}, []
@@ -329,7 +344,7 @@ def prepare_c2(args):
 
 def type_pool(entries):
     """entries: iterable of (row_id, set(types), {type: definition}) -> pool helpers."""
-    count, desc, co = collections.Counter(), {}, collections.defaultdict(collections.Counter)
+    count, desc = collections.Counter(), {}
     for _, types, d in entries:
         for t in types:
             count[t] += 1
@@ -501,6 +516,7 @@ def assemble(args):
     """Round 2: synth_g, synth_r, synth_c into data/mix2, then absent labels (n)
     added to FiNERWeb and Pile train rows."""
     from transformers import AutoTokenizer
+
     from ..data.prepare_data import word_ngrams
     from ..data.prepare_mix import find_all
     stats = collections.Counter()
@@ -559,6 +575,7 @@ def g_rows(task, source, stats, find_all):
 def assemble_c(args):
     """Rebuild MIX_DIR/synth_c from all seeded generations (c2 + c3 + round 1)."""
     from transformers import AutoTokenizer
+
     from ..data.prepare_data import word_ngrams
     from ..data.prepare_mix import find_all
     stats = collections.Counter()
@@ -570,6 +587,7 @@ def assemble_c(args):
 def assemble_g2(args):
     """Build data/mix2/synth_g2 (round-3 music / literature / spoken synthetic text) only."""
     from transformers import AutoTokenizer
+
     from ..data.prepare_mix import find_all
     stats = collections.Counter()
     tok = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
@@ -725,23 +743,31 @@ def apply_n(mix, stats, summary, find_all):
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("fetch-real"); p.add_argument("--seed", type=int, default=42)
-    p = sub.add_parser("prepare-g"); p.add_argument("--n", type=int, default=120000)
+    p = sub.add_parser("fetch-real")
     p.add_argument("--seed", type=int, default=42)
-    p = sub.add_parser("prepare-c2"); p.add_argument("--per-domain", type=int, default=2060)
+    p = sub.add_parser("prepare-g")
+    p.add_argument("--n", type=int, default=120000)
+    p.add_argument("--seed", type=int, default=42)
+    p = sub.add_parser("prepare-c2")
+    p.add_argument("--per-domain", type=int, default=2060)
     p.add_argument("--tag", default="c2", choices=["c2", "c3"])
-    p = sub.add_parser("assemble-c"); p.add_argument("--seed", type=int, default=42)
+    p = sub.add_parser("assemble-c")
+    p.add_argument("--seed", type=int, default=42)
     p.add_argument("--max-tokens", type=int, default=1024)
     sub.add_parser("prepare-r2")
     sub.add_parser("prepare-n")
-    p = sub.add_parser("assemble"); p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--max-tokens", type=int, default=1024)
-    p = sub.add_parser("prepare-g2"); p.add_argument("--n", type=int, default=40000)
+    p = sub.add_parser("assemble")
     p.add_argument("--seed", type=int, default=42)
-    p = sub.add_parser("assemble-g2"); p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--max-tokens", type=int, default=1024)
+    p = sub.add_parser("prepare-g2")
+    p.add_argument("--n", type=int, default=40000)
+    p.add_argument("--seed", type=int, default=42)
+    p = sub.add_parser("assemble-g2")
+    p.add_argument("--seed", type=int, default=42)
     p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--task", default="g2", choices=["g2", "g3"])
-    p = sub.add_parser("prepare-g3"); p.add_argument("--n", type=int, default=370000)
+    p = sub.add_parser("prepare-g3")
+    p.add_argument("--n", type=int, default=370000)
     p.add_argument("--seed", type=int, default=42)
     sub.add_parser("prepare-fill")
     sub.add_parser("apply-fill")

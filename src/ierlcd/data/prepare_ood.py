@@ -20,7 +20,8 @@ SOURCES = {
     "crossner_politics": ("mneb/cross-ner", "64e9a4a56dbe9457c7ad8fe68a710b81ed63599f", "data/politics/test.jsonl"),
     "crossner_science": ("mneb/cross-ner", "64e9a4a56dbe9457c7ad8fe68a710b81ed63599f", "data/science/test.jsonl"),
     "mit_movie": ("mneb/mit-movie", "7713e53a7e6b4b181ebdb984803d024a825b83c6", "data/mit_movie_complex_test.jsonl"),
-    "mit_restaurant": ("mneb/mit-restaurant", "9dc75d3666eea550722ae4cc3bb9dfc9d3b7ceed", "data/mit_restaurant_test.jsonl"),
+    "mit_restaurant": ("mneb/mit-restaurant", "9dc75d3666eea550722ae4cc3bb9dfc9d3b7ceed",
+                       "data/mit_restaurant_test.jsonl"),
 }
 
 

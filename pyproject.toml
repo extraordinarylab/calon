@@ -1,0 +1,51 @@
+[project]
+name = "ierlcd"
+version = "0.1.0"
+description = "Schema-conditioned NER / RE with RLCD calibrated decisions"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "torch",
+    "transformers>=5",
+    "huggingface_hub",
+]
+
+[project.optional-dependencies]
+data = ["pandas", "pyarrow", "datasets"]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+# pyflakes (F), pycodestyle errors (E) and warnings (W), import sorting (I)
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E731",   # small lambdas assigned to names are used on purpose in helpers
+    "E741",   # short math names (l for label vectors, as in the equations)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# LLM prompt templates are kept verbatim (changing them changes the generated data)
+"src/ierlcd/synth/*.py" = ["E501"]
+"src/ierlcd/eval/newtest.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ierlcd", "tools"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = ["ierlcd"]
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = true

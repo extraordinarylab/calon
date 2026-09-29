@@ -13,6 +13,7 @@ pytestmark = pytest.mark.skipif(not (QWEN / "config.json").exists(), reason="Qwe
 
 def build(impl):
     from transformers import AutoTokenizer
+
     from ierlcd.data.collator import add_control_tokens
     from ierlcd.model.model import SpanLabelModel
     tok = AutoTokenizer.from_pretrained(QWEN)

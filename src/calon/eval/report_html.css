@@ -1,0 +1,45 @@
+/* Layout: one column; a versions table up front, then one wide scrolling table per benchmark group */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --fg: #1b2230; --muted: #5d6677; --rule: #dbe0e8;
+  --accent: #2d5fa8; --accent-soft: #e5edf8; --best: #12623f; --best-soft: #e1f2e8;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a202a; --fg: #e3e8f0; --muted: #9aa4b5; --rule: #2c3442;
+    --accent: #8db4ec; --accent-soft: #223249; --best: #7fd3a5; --best-soft: #1d3a2b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a202a; --fg: #e3e8f0; --muted: #9aa4b5; --rule: #2c3442;
+  --accent: #8db4ec; --accent-soft: #223249; --best: #7fd3a5; --best-soft: #1d3a2b; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 18px; padding-block: 36px 64px; display: grid; gap: 40px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: .08em; color: var(--accent); text-transform: uppercase; }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 38px); margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 21px; margin: 0; text-wrap: balance; }
+/* no ch cap: in Chinese text "ch" is half a character, so 78ch broke lines after ~39 characters */
+p { margin: 0; text-wrap: pretty; }
+.lede { color: var(--muted); }
+section { display: grid; gap: 12px; min-width: 0; }
+.note { font-size: 13px; color: var(--muted); }
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; white-space: nowrap; }
+/* text cells keep a usable width (wide tables scroll instead of squeezing prose into a few characters per line);
+   set names in result tables stay on one line */
+td { text-wrap: pretty; }
+td:not(.n) { min-width: 16em; }
+td:first-child { min-width: 7em; }
+table.res td:first-child, td.key { white-space: nowrap; min-width: 0; }
+td.n, th.n { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.best { color: var(--best); background: var(--best-soft); font-weight: 600; }
+td.dim { color: var(--muted); }
+.sd { color: var(--muted); font-size: 11px; font-weight: 400; }
+tr.group td { background: var(--accent-soft); color: var(--accent); font-weight: 500; font-size: 12px; }
+tr.avg td { font-weight: 600; border-bottom: 2px solid var(--rule); }
